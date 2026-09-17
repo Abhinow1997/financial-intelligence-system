@@ -1,0 +1,50 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+env/
+.python-version
+
+# --- Tooling ---
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# --- Secrets / env (NEVER commit) ---
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+secrets/
+
+# --- Data lake (keep dirs via .gitkeep, ignore contents) ---
+data/raw/*
+data/processed/*
+data/features/*
+!data/**/.gitkeep
+!data/samples/**
+
+# --- Models / vectors / artifacts ---
+*.pkl
+*.joblib
+*.onnx
+*.faiss
+artifacts/
+mlruns/
+
+# --- Notebooks ---
+.ipynb_checkpoints/
+
+# --- OS / IDE ---
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/

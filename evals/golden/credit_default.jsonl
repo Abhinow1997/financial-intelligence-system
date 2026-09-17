@@ -1,0 +1,2 @@
+{"id": "cd-001", "input": {"debt_to_income": 0.2, "fico": 780, "utilization": 0.1, "delinquencies_2y": 0}, "expected": {"decision": "approve"}}
+{"id": "cd-002", "input": {"debt_to_income": 0.9, "fico": 540, "utilization": 0.8, "delinquencies_2y": 3}, "expected": {"decision": "decline"}}

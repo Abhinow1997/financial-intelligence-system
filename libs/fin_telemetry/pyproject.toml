@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "fin-telemetry"
+version = "0.1.0"
+description = "Tracing, cost and latency helpers."
+requires-python = ">=3.11"
+dependencies = ["pydantic>=2.7", "pydantic-settings>=2.3"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
