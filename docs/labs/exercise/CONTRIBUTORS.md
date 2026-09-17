@@ -9,3 +9,4 @@ Format: `- <Name> (<github-handle>) - <team> - joined <YYYY-MM-DD>`
 
 
 # Team member 1
+# Team member 2 
