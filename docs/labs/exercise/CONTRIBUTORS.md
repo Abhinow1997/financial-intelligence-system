@@ -8,6 +8,8 @@ Format: `- <Name> (<github-handle>) - <team> - joined <YYYY-MM-DD>`
 <!-- END:contributors -->
 
 
+# Team member 1
+# Team member 2 
 # team member 3
 # Team member 1
 
