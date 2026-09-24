@@ -1,9 +1,12 @@
 # Financial Intelligence System - local orchestration.
 #
 # Profiles let you start only what you need:
-#   docker compose --profile core up            # gateway + backend + frontend + model + rag + agent
-#   docker compose --profile data up            # datastores only (postgres/redis/qdrant/minio/redpanda)
+#   docker compose up                           # DEFAULT: backend :8000 + frontend :8501 (Lab 01)
+#   docker compose --profile core up            # + gateway + model + rag + agent
+#   docker compose --profile data up            # + datastores (postgres/redis/qdrant/minio/redpanda)
 #   docker compose --profile full up            # everything
+#
+# backend and frontend are profile-less, so they start in ALL of the above.
 #
 # Add more services by copying a block below - they all follow the same shape.
 
@@ -20,21 +23,28 @@ services:
     profiles: ["core", "full"]
     depends_on: [backend]
 
+  # backend and frontend carry no profile, so they are the DEFAULT stack:
+  # a bare `docker compose up` starts exactly these two. They also come along
+  # with every named profile below.
   backend:
     <<: *python-svc
-    build: ./services/backend
+    # Root context: deps come from the monorepo pyproject.toml + poetry.lock.
+    build:
+      context: .
+      dockerfile: services/backend/Dockerfile
     ports: ["8000:8000"]
-    profiles: ["core", "full"]
-    depends_on: [model_service, retriever]
 
   frontend:
     <<: *python-svc
-    build: ./services/frontend
+    # Root context: deps come from the monorepo pyproject.toml + poetry.lock.
+    build:
+      context: .
+      dockerfile: services/frontend/Dockerfile
     environment:
       GATEWAY_URL: http://gateway:8080
+      BACKEND_URL: http://backend:8000
     ports: ["8501:8501"]
-    profiles: ["core", "full"]
-    depends_on: [gateway]
+    depends_on: [backend]
 
   # ---------------- Analytics / R1 ----------------
   model_service:
@@ -67,7 +77,7 @@ services:
     <<: *python-svc
     build: ./services/agents/tool_registry
     ports: ["8510:8510"]
-    profiles: ["full"]
+    profiles: ["core", "full"]
 
   agent_runtime:
     <<: *python-svc

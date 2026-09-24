@@ -1,0 +1,23 @@
+[project]
+name = "financial-intelligence-system"
+version = "0.1.0"
+description = ""
+authors = [
+    {name = "Yohan Markose",email = "yohanmarkose7@gmail.com"}
+]
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "streamlit (>=1.64.0,<2.0.0)",
+    "fastapi (>=0.141.1,<0.142.0)",
+    "uvicorn[standard] (>=0.53.0,<0.54.0)",
+    "yfinance (>=1.7.0,<2.0.0)",
+    "plotly (>=7.1.0,<8.0.0)",
+    "requests (>=2.34.2,<3.0.0)",
+    "pandas (>=3.0.6,<4.0.0)"
+]
+
+
+[build-system]
+requires = ["poetry-core>=2.0.0,<3.0.0"]
+build-backend = "poetry.core.masonry.api"

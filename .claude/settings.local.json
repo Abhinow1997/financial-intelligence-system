@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(python --version)",
+      "PowerShell(pip show yfinance 2>$null)",
+      "PowerShell(docker --version)"
+    ]
+  }
+}

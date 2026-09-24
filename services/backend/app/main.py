@@ -3,10 +3,14 @@
 from fastapi import FastAPI
 from pydantic import BaseModel
 
+from app.market import router as market_router
+
 app = FastAPI(title="Core Backend", version="0.1.0")
 
 SERVICE = "backend"
 RELEASE = "R1+"
+
+app.include_router(market_router)
 
 
 @app.get("/health")

@@ -40,6 +40,12 @@ data/features/*
 artifacts/
 mlruns/
 
+# --- Airflow (keep dirs via .gitkeep, ignore runtime output) ---
+logs/*
+!logs/.gitkeep
+config/airflow.cfg
+plugins/__pycache__/
+
 # --- Notebooks ---
 .ipynb_checkpoints/
 
