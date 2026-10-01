@@ -23,3 +23,25 @@ stages:
       md5: d2b94d3cb4f2e650c77c96c001123a90.dir
       size: 30044943
       nfiles: 5
+  parse:
+    cmd: python src/parse.py
+    deps:
+    - path: data/raw
+      hash: md5
+      md5: d2b94d3cb4f2e650c77c96c001123a90.dir
+      size: 30044943
+      nfiles: 5
+    - path: src/parse.py
+      hash: md5
+      md5: 2c929f9d706f7fe70425acb9672f685c
+      size: 2776
+    params:
+      params.yaml:
+        parse:
+          apply_scale: false
+    outs:
+    - path: data/parsed
+      hash: md5
+      md5: ef45b9ef0cf3553c88a976676aa75deb.dir
+      size: 639
+      nfiles: 1

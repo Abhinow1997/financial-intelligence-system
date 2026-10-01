@@ -12,3 +12,7 @@ download:
   # SEC fair-access rules: every request must say who is asking.
   user_agent_name: NEU-DAMG7245-DVC-Demo
   user_agent_email: gangurde.a@northeastern.edu
+
+parse:
+  # Deliberate demo bug: start by ignoring the "(in thousands)" caption.
+  apply_scale: false

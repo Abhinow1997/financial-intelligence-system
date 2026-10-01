@@ -7,3 +7,12 @@ stages:
     - download
     outs:
     - data/raw
+  parse:
+    cmd: python src/parse.py
+    deps:
+    - data/raw
+    - src/parse.py
+    params:
+    - parse
+    outs:
+    - data/parsed
