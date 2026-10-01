@@ -3,7 +3,7 @@ name = "financial-intelligence-system"
 version = "0.1.0"
 description = ""
 authors = [
-    {name = "Yohan Markose",email = "yohanmarkose7@gmail.com"}
+    {name = "Abhinav Gangurde",email = "gangurde.a@northeastern.edu"}
 ]
 readme = "README.md"
 requires-python = ">=3.11"

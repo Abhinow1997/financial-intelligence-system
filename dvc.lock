@@ -45,3 +45,29 @@ stages:
       md5: ef45b9ef0cf3553c88a976676aa75deb.dir
       size: 639
       nfiles: 1
+  evaluate:
+    cmd: python src/evaluate.py
+    deps:
+    - path: data/parsed
+      hash: md5
+      md5: ef45b9ef0cf3553c88a976676aa75deb.dir
+      size: 639
+      nfiles: 1
+    - path: data/raw
+      hash: md5
+      md5: d2b94d3cb4f2e650c77c96c001123a90.dir
+      size: 30044943
+      nfiles: 5
+    - path: src/evaluate.py
+      hash: md5
+      md5: 42f1d0c9ae559b45a8522db44a4e75e1
+      size: 3583
+    outs:
+    - path: reports/metrics.json
+      hash: md5
+      md5: ea7b55046cfb8d4328fe23feb5ac82cd
+      size: 77
+    - path: reports/xbrl_check.csv
+      hash: md5
+      md5: 10e6dd71f63a3865c837725d991712c5
+      size: 653

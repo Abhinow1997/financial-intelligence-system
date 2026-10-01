@@ -16,3 +16,15 @@ stages:
     - parse
     outs:
     - data/parsed
+  evaluate:
+    cmd: python src/evaluate.py
+    deps:
+    - data/parsed
+    - data/raw
+    - src/evaluate.py
+    outs:
+    - reports/xbrl_check.csv:
+        cache: false
+    metrics:
+    - reports/metrics.json:
+        cache: false
