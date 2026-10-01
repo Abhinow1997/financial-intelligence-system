@@ -1,0 +1,25 @@
+schema: '2.0'
+stages:
+  download:
+    cmd: python src/download.py
+    deps:
+    - path: src/download.py
+      hash: md5
+      md5: eead941b13d3564859accc62e1953863
+      size: 2916
+    params:
+      params.yaml:
+        download:
+          ticker: NFLX
+          forms:
+          - 10-K
+          after: '2025-01-01'
+          before: '2026-03-31'
+          user_agent_name: NEU-DAMG7245-DVC-Demo
+          user_agent_email: gangurde.a@northeastern.edu
+    outs:
+    - path: data/raw
+      hash: md5
+      md5: d2b94d3cb4f2e650c77c96c001123a90.dir
+      size: 30044943
+      nfiles: 5

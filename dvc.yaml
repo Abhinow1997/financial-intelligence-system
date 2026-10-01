@@ -1,0 +1,9 @@
+stages:
+  download:
+    cmd: python src/download.py
+    deps:
+    - src/download.py
+    params:
+    - download
+    outs:
+    - data/raw

@@ -1,0 +1,14 @@
+# Every knob the pipeline uses lives here. DVC records these values in
+# dvc.lock and re-runs only the stages whose params changed.
+
+download:
+  ticker: NFLX
+  forms: ["10-K"]
+  # Filing-date window, pinned so the corpus never changes. It selects exactly
+  # two 10-Ks: FY2024 (filed 2025-01-27) and FY2025 (filed 2026-01-23).
+  # "The latest two filings" would silently change when the next 10-K lands.
+  after: "2025-01-01"
+  before: "2026-03-31"
+  # SEC fair-access rules: every request must say who is asking.
+  user_agent_name: NEU-DAMG7245-DVC-Demo
+  user_agent_email: gangurde.a@northeastern.edu
