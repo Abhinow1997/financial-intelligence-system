@@ -1,0 +1,7 @@
+[core]
+    remote = s3store
+['remote "demo"']
+    url = C:/Users/gangurde.a/dvc-remote
+['remote "s3store"']
+    url = s3://pdfparserdataset/dvc-demo
+    region = us-east-2
