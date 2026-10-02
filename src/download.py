@@ -3,7 +3,7 @@
 Writes (the stage's output, owned by DVC and ignored by Git):
   data/raw/sec-edgar-filings/<TICKER>/<FORM>/<ACCESSION>/full-submission.txt
   data/raw/sec-edgar-filings/<TICKER>/<FORM>/<ACCESSION>/primary-document.html
-  data/raw/companyfacts.json  the SEC's XBRL facts for those filings (answer key)
+  data/raw/companyfacts/<TICKER>.json  the SEC's XBRL facts for that company's filings
 """
 
 import argparse
@@ -41,6 +41,15 @@ def keep_only(facts: dict, accessions: set[str]) -> dict:
     return {"cik": facts["cik"], "entityName": facts["entityName"], "us-gaap": kept}
 
 
+def read_cik(submission: Path) -> str:
+    """The CIK is the CENTRAL INDEX KEY line in the SEC header of full-submission.txt."""
+    header = submission.read_text(encoding="utf-8", errors="ignore")[:5000]
+    match = re.search(r"CENTRAL INDEX KEY:\s*(\d+)", header)
+    if not match:
+        raise SystemExit(f"No CENTRAL INDEX KEY found in the SEC header of {submission}")
+    return match.group(1)
+
+
 def main() -> None:
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("--params", default="params.yaml")
@@ -50,24 +59,27 @@ def main() -> None:
     p = yaml.safe_load(Path(args.params).read_text(encoding="utf-8"))["download"]
     out = Path(args.out)
     user_agent = f"{p['user_agent_name']} {p['user_agent_email']}"
-
     dl = Downloader(p["user_agent_name"], p["user_agent_email"], out)
-    for form in p["forms"]:
-        n = dl.get(form, p["ticker"], after=p["after"], before=p["before"],
-                   download_details=True)
-        print(f"{p['ticker']} {form}: downloaded {n} filing(s)")
 
-    # The accession number is the folder name; the CIK is in the SEC header.
-    subs = sorted(out.rglob("full-submission.txt"))
-    accessions = {s.parent.name for s in subs}
-    header = subs[0].read_text(encoding="utf-8", errors="ignore")[:5000]
-    cik = re.search(r"CENTRAL INDEX KEY:\s*(\d+)", header).group(1)
+    # Each company has its own filing window, because fiscal years end at different times.
+    for ticker, window in p["companies"].items():
+        for form in p["forms"]:
+            n = dl.get(form, ticker, after=window["after"], before=window["before"],
+                       download_details=True)
+            print(f"{ticker} {form}: downloaded {n} filing(s)")
 
-    facts = keep_only(fetch_companyfacts(cik, user_agent), accessions)
-    (out / "companyfacts.json").write_text(
-        json.dumps(facts, indent=1, sort_keys=True), encoding="utf-8", newline="\n"
-    )
-    print(f"companyfacts: {len(facts['us-gaap'])} concepts for {sorted(accessions)}")
+        # The accession number is the folder name; look only inside this company's folder.
+        subs = sorted((out / "sec-edgar-filings" / ticker).rglob("full-submission.txt"))
+        if not subs:
+            raise SystemExit(f"No filings downloaded for {ticker}: check its dates in params.yaml")
+        accessions = {s.parent.name for s in subs}
+
+        facts = keep_only(fetch_companyfacts(read_cik(subs[0]), user_agent), accessions)
+        dest = out / "companyfacts" / f"{ticker}.json"
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        dest.write_text(json.dumps(facts, indent=1, sort_keys=True),
+                        encoding="utf-8", newline="\n")
+        print(f"{ticker} companyfacts: {len(facts['us-gaap'])} concepts for {sorted(accessions)}")
 
 
 if __name__ == "__main__":

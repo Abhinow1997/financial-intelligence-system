@@ -1,7 +1,11 @@
 {
   "xbrl": {
-    "lines": 8,
-    "matched": 2,
-    "match_rate": 0.25
+    "lines": 16,
+    "matched": 4,
+    "match_rate": 0.25,
+    "by_ticker": {
+      "AAPL": 0.25,
+      "NFLX": 0.25
+    }
   }
 }

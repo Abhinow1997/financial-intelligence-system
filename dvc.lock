@@ -5,36 +5,40 @@ stages:
     deps:
     - path: src/download.py
       hash: md5
-      md5: eead941b13d3564859accc62e1953863
-      size: 2916
+      md5: 2a52b56d3a92456f02c888d9808cefc9
+      size: 3646
     params:
       params.yaml:
         download:
-          ticker: NFLX
           forms:
           - 10-K
-          after: '2025-01-01'
-          before: '2026-03-31'
+          companies:
+            NFLX:
+              after: '2025-01-01'
+              before: '2026-03-31'
+            AAPL:
+              after: '2024-10-01'
+              before: '2025-12-31'
           user_agent_name: NEU-DAMG7245-DVC-Demo
           user_agent_email: gangurde.a@northeastern.edu
     outs:
     - path: data/raw
       hash: md5
-      md5: d2b94d3cb4f2e650c77c96c001123a90.dir
-      size: 30044943
-      nfiles: 5
+      md5: bac27865d6961ba0cd7f0f1a054855e0.dir
+      size: 52444339
+      nfiles: 10
   parse:
     cmd: python src/parse.py
     deps:
     - path: data/raw
       hash: md5
-      md5: d2b94d3cb4f2e650c77c96c001123a90.dir
-      size: 30044943
-      nfiles: 5
+      md5: bac27865d6961ba0cd7f0f1a054855e0.dir
+      size: 52444339
+      nfiles: 10
     - path: src/parse.py
       hash: md5
-      md5: 2c929f9d706f7fe70425acb9672f685c
-      size: 2776
+      md5: cdc2e71225a1b1bd1fe43931dd7825c9
+      size: 3175
     params:
       params.yaml:
         parse:
@@ -42,32 +46,32 @@ stages:
     outs:
     - path: data/parsed
       hash: md5
-      md5: ef45b9ef0cf3553c88a976676aa75deb.dir
-      size: 639
+      md5: 5d0fc5edf917ca89e1c8b432efbabbfe.dir
+      size: 1284
       nfiles: 1
   evaluate:
     cmd: python src/evaluate.py
     deps:
     - path: data/parsed
       hash: md5
-      md5: ef45b9ef0cf3553c88a976676aa75deb.dir
-      size: 639
+      md5: 5d0fc5edf917ca89e1c8b432efbabbfe.dir
+      size: 1284
       nfiles: 1
     - path: data/raw
       hash: md5
-      md5: d2b94d3cb4f2e650c77c96c001123a90.dir
-      size: 30044943
-      nfiles: 5
+      md5: bac27865d6961ba0cd7f0f1a054855e0.dir
+      size: 52444339
+      nfiles: 10
     - path: src/evaluate.py
       hash: md5
-      md5: 42f1d0c9ae559b45a8522db44a4e75e1
-      size: 3583
+      md5: 9ab8abf74dfe4da4b7791b2d194a476a
+      size: 4396
     outs:
     - path: reports/metrics.json
       hash: md5
-      md5: ea7b55046cfb8d4328fe23feb5ac82cd
-      size: 77
+      md5: 4de5e782e2e98d0d6991cdf0c8e6477b
+      size: 143
     - path: reports/xbrl_check.csv
       hash: md5
-      md5: 10e6dd71f63a3865c837725d991712c5
-      size: 653
+      md5: f8e376c829d4906e0509bd3685e0062c
+      size: 1358
