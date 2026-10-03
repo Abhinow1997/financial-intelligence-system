@@ -1,12 +1,7 @@
 """
 Demo Streamlit app with LLM connection.
-Run: streamlit run demo_llm.py
-"""
-"""
-Demo Streamlit app with LLM connection.
 Run: streamlit run services/frontend/app/demo_llm.py
 """
-import os
 import streamlit as st
 from pathlib import Path
 from dotenv import load_dotenv
