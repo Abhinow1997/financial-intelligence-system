@@ -28,7 +28,10 @@ jobs:
         run: ruff check .
 
       - name: Test
-        run: pytest -q
+        # Repo-level tests only. Every service has its own app/ and tests/ folders, so
+        # one pytest run from the root can't load them all; run a service's tests from
+        # its own folder instead (e.g. cd services/backend && pytest -q).
+        run: pytest -q tests
 
   # Blocking evaluation gate (wired up in R4/R6). Fails the build when quality,
   # cost, or latency regress past the acceptance thresholds.
