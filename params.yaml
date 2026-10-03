@@ -6,7 +6,6 @@ download:
   companies:
     NFLX: {after: "2025-01-01", before: "2026-03-31"} 
     AAPL: {after: "2024-10-01", before: "2025-12-31"}
-
   user_agent_name: NEU-DAMG7245-DVC-Demo
   user_agent_email: gangurde.a@northeastern.edu
 

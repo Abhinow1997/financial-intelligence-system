@@ -37,8 +37,8 @@ stages:
       nfiles: 10
     - path: src/parse.py
       hash: md5
-      md5: cdc2e71225a1b1bd1fe43931dd7825c9
-      size: 3175
+      md5: ad8da5999b876389e33f28ef614dbe79
+      size: 5652
     params:
       params.yaml:
         parse:
@@ -46,16 +46,16 @@ stages:
     outs:
     - path: data/parsed
       hash: md5
-      md5: 5d0fc5edf917ca89e1c8b432efbabbfe.dir
-      size: 1284
+      md5: 0335848850d6817ece1a9da128672156.dir
+      size: 1632
       nfiles: 1
   evaluate:
     cmd: python src/evaluate.py
     deps:
     - path: data/parsed
       hash: md5
-      md5: 5d0fc5edf917ca89e1c8b432efbabbfe.dir
-      size: 1284
+      md5: 0335848850d6817ece1a9da128672156.dir
+      size: 1632
       nfiles: 1
     - path: data/raw
       hash: md5
@@ -64,8 +64,8 @@ stages:
       nfiles: 10
     - path: src/evaluate.py
       hash: md5
-      md5: 9ab8abf74dfe4da4b7791b2d194a476a
-      size: 4396
+      md5: 401aa862fab8aa4ba634a34e08057f58
+      size: 4134
     outs:
     - path: reports/metrics.json
       hash: md5
@@ -73,5 +73,5 @@ stages:
       size: 143
     - path: reports/xbrl_check.csv
       hash: md5
-      md5: f8e376c829d4906e0509bd3685e0062c
-      size: 1358
+      md5: 40c4402c53b2312f89d7e1dc61ee87c8
+      size: 1720

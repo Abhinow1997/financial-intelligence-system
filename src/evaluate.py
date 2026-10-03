@@ -1,6 +1,7 @@
 """DVC stage `evaluate`: check parse's numbers against the SEC's XBRL values.
 
-Reads  data/parsed/income_statement.csv      (output of `parse`)
+Reads  data/parsed/income_statement.csv      (output of `parse`, which also records
+                                             the XBRL concept each line is tagged with)
        data/raw/companyfacts/<TICKER>.json   (output of `download`: the answer key)
 Writes reports/xbrl_check.csv                one row per line, with a status
        reports/metrics.json                  match rates (a DVC metrics file)
@@ -13,16 +14,6 @@ import math
 from datetime import date
 from pathlib import Path
 
-# Statement line -> the XBRL concepts it may be tagged with, tried in order.
-# Companies tag the same line differently: revenue is "Revenues" for Netflix but
-# "RevenueFromContractWithCustomerExcludingAssessedTax" for Apple.
-CONCEPTS = {
-    "Revenues": ("Revenues", "RevenueFromContractWithCustomerExcludingAssessedTax"),
-    "Operating income": ("OperatingIncomeLoss",),
-    "Net income": ("NetIncomeLoss",),
-    "Diluted EPS": ("EarningsPerShareDiluted",),
-}
-
 
 def is_full_year(v: dict) -> bool:
     if "start" not in v:
@@ -31,22 +22,23 @@ def is_full_year(v: dict) -> bool:
     return days > 350  # a full year, not a quarter
 
 
-def xbrl_value(facts: dict, concepts: tuple, accession: str, period_end: str):
-    """The full-year value for `period_end`, as reported in that same filing.
+def xbrl_value(facts: dict, concept: str, accession: str, period_end: str):
+    """The SEC's full-year value for `concept`, as reported in that same filing.
 
     Match on accession, never on "fy": the same year appears in several filings,
     and Netflix's FY2025 10-K restates 2024 EPS after its 10-for-1 stock split.
     """
-    for concept in concepts:
-        for values in facts["us-gaap"].get(concept, {}).get("units", {}).values():
-            for v in values:
-                same_filing = v["accn"] == accession and v["end"] == period_end
-                if same_filing and is_full_year(v):
-                    return float(v["val"])
+    for values in facts["us-gaap"].get(concept, {}).get("units", {}).values():
+        for v in values:
+            same_filing = v["accn"] == accession and v["end"] == period_end
+            if same_filing and is_full_year(v):
+                return float(v["val"])
     return None
 
 
-def status(parsed: float, xbrl) -> str:
+def status(parsed, xbrl) -> str:
+    if parsed is None:
+        return "parse_missing"
     if xbrl is None:
         return "xbrl_missing"
     if math.isclose(parsed, xbrl, rel_tol=1e-4):
@@ -85,18 +77,20 @@ def main() -> None:
 
     checks = []
     for r in rows:
-        xbrl = xbrl_value(facts[r["ticker"]], CONCEPTS[r["line"]],
-                          r["accession"], r["period_end"])
-        parsed = float(r["value"])
+        parsed = float(r["value"]) if r["value"] else None
+        xbrl = None
+        if r["concept"]:
+            xbrl = xbrl_value(facts[r["ticker"]], r["concept"], r["accession"],
+                              r["period_end"])
         checks.append([r["ticker"], r["accession"], r["period_end"], r["line"],
-                       parsed, xbrl, status(parsed, xbrl)])
+                       r["concept"], parsed, xbrl, status(parsed, xbrl)])
 
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
     with open(out / "xbrl_check.csv", "w", newline="", encoding="utf-8") as f:
         w = csv.writer(f, lineterminator="\n")
-        w.writerow(["ticker", "accession", "period_end", "line", "parsed", "xbrl",
-                    "status"])
+        w.writerow(["ticker", "accession", "period_end", "line", "concept", "parsed",
+                    "xbrl", "status"])
         w.writerows(checks)
 
     metrics = {"xbrl": summary(checks)}
@@ -106,7 +100,7 @@ def main() -> None:
     (out / "metrics.json").write_text(json.dumps(metrics, indent=2) + "\n",
                                       encoding="utf-8", newline="\n")
     for c in checks:
-        print(f"{c[0]:5} {c[3]:17} {c[2]}  {c[6]}")
+        print(f"{c[0]:5} {c[3]:17} {c[2]}  {c[-1]}")
     xb = metrics["xbrl"]
     print(f"XBRL match rate: {xb['matched']}/{xb['lines']}  by ticker: {xb['by_ticker']}")
 
