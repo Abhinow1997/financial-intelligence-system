@@ -1,0 +1,30 @@
+stages:
+  download:
+    cmd: python src/download.py
+    deps:
+    - src/download.py
+    params:
+    - download
+    outs:
+    - data/raw
+  parse:
+    cmd: python src/parse.py
+    deps:
+    - data/raw
+    - src/parse.py
+    params:
+    - parse
+    outs:
+    - data/parsed
+  evaluate:
+    cmd: python src/evaluate.py
+    deps:
+    - data/parsed
+    - data/raw
+    - src/evaluate.py
+    outs:
+    - reports/xbrl_check.csv:
+        cache: false
+    metrics:
+    - reports/metrics.json:
+        cache: false

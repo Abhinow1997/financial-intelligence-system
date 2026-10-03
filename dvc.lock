@@ -1,0 +1,77 @@
+schema: '2.0'
+stages:
+  download:
+    cmd: python src/download.py
+    deps:
+    - path: src/download.py
+      hash: md5
+      md5: 2a52b56d3a92456f02c888d9808cefc9
+      size: 3646
+    params:
+      params.yaml:
+        download:
+          forms:
+          - 10-K
+          companies:
+            NFLX:
+              after: '2025-01-01'
+              before: '2026-03-31'
+            AAPL:
+              after: '2024-10-01'
+              before: '2025-12-31'
+          user_agent_name: NEU-DAMG7245-DVC-Demo
+          user_agent_email: gangurde.a@northeastern.edu
+    outs:
+    - path: data/raw
+      hash: md5
+      md5: bac27865d6961ba0cd7f0f1a054855e0.dir
+      size: 52444339
+      nfiles: 10
+  parse:
+    cmd: python src/parse.py
+    deps:
+    - path: data/raw
+      hash: md5
+      md5: bac27865d6961ba0cd7f0f1a054855e0.dir
+      size: 52444339
+      nfiles: 10
+    - path: src/parse.py
+      hash: md5
+      md5: ad8da5999b876389e33f28ef614dbe79
+      size: 5652
+    params:
+      params.yaml:
+        parse:
+          apply_scale: false
+    outs:
+    - path: data/parsed
+      hash: md5
+      md5: 0335848850d6817ece1a9da128672156.dir
+      size: 1632
+      nfiles: 1
+  evaluate:
+    cmd: python src/evaluate.py
+    deps:
+    - path: data/parsed
+      hash: md5
+      md5: 0335848850d6817ece1a9da128672156.dir
+      size: 1632
+      nfiles: 1
+    - path: data/raw
+      hash: md5
+      md5: bac27865d6961ba0cd7f0f1a054855e0.dir
+      size: 52444339
+      nfiles: 10
+    - path: src/evaluate.py
+      hash: md5
+      md5: 401aa862fab8aa4ba634a34e08057f58
+      size: 4134
+    outs:
+    - path: reports/metrics.json
+      hash: md5
+      md5: 4de5e782e2e98d0d6991cdf0c8e6477b
+      size: 143
+    - path: reports/xbrl_check.csv
+      hash: md5
+      md5: 40c4402c53b2312f89d7e1dc61ee87c8
+      size: 1720

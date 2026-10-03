@@ -3,7 +3,7 @@ name = "financial-intelligence-system"
 version = "0.1.0"
 description = ""
 authors = [
-    {name = "Yohan Markose",email = "yohanmarkose7@gmail.com"}
+    {name = "Abhinav Gangurde",email = "gangurde.a@northeastern.edu"}
 ]
 readme = "README.md"
 requires-python = ">=3.11"
@@ -14,10 +14,18 @@ dependencies = [
     "yfinance (>=1.7.0,<2.0.0)",
     "plotly (>=7.1.0,<8.0.0)",
     "requests (>=2.34.2,<3.0.0)",
-    "pandas (>=3.0.6,<4.0.0)"
+    "pandas (>=3.0.6,<4.0.0)",
+    "dvc[s3] (>=3.67.1,<4.0.0)",
+    "sec-edgar-downloader (>=5.1.0,<6.0.0)",
+    "pyyaml (>=6.0.3,<7.0.0)"
 ]
 
 
 [build-system]
 requires = ["poetry-core>=2.0.0,<3.0.0"]
 build-backend = "poetry.core.masonry.api"
+
+[tool.ruff.lint]
+# Bugs only: syntax errors, undefined names, unused imports, misplaced imports.
+# Listed explicitly so a new Ruff release can't change what CI checks.
+select = ["E4", "E7", "E9", "F"]

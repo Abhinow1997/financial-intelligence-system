@@ -1,0 +1,13 @@
+# Every knob the pipeline uses lives here. DVC records these values in
+# dvc.lock and re-runs only the stages whose params changed.
+
+download:
+  forms: ["10-K"]
+  companies:
+    NFLX: {after: "2025-01-01", before: "2026-03-31"} 
+    AAPL: {after: "2024-10-01", before: "2025-12-31"}
+  user_agent_name: NEU-DAMG7245-DVC-Demo
+  user_agent_email: gangurde.a@northeastern.edu
+
+parse:
+  apply_scale: false
