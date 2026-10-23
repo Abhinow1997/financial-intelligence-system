@@ -15,16 +15,29 @@ st.set_page_config(page_title="Financial Intelligence System", layout="wide")
 st.title("Financial Intelligence System")
 st.caption("Analyst dashboard - predictions, grounded answers, agent traces, unit economics.")
 
-tab_market, tab1, tab2, tab3, tab4 = st.tabs(
-    ["Market (Lab 01)", "Predict (R1)", "Ask/RAG (R2)", "Agent (R3)", "Economics"]
+tab_market, tab_facts, tab1, tab2, tab3, tab4 = st.tabs(
+    ["Market (Lab 01)", "Facts (DuckDB)", "Predict (R1)", "Ask/RAG (R2)", "Agent (R3)", "Economics"]
 )
+
+FACT_METRICS = {
+    "revenue": "Revenue",
+    "operating_income": "Operating income",
+    "net_income": "Net income",
+    "eps_diluted": "Diluted EPS",
+}
+# Where the backend found the facts -> how to say so (st.<kind>, message)
+FACT_SOURCES = {
+    "fact_store": ("success", "From the fact store, data/facts/facts.duckdb (built by src/facts/build.py)."),
+    "sec_cache": ("info", "From the fact store, data/facts/facts.duckdb (fetched from the SEC earlier and saved there)."),
+    "sec_live": ("warning", "Not in DuckDB yet: fetched live from the SEC just now and saved to data/facts/facts.duckdb."),
+}
 
 
 def compact(value: float | None) -> str:
     if not value:
         return "-"
     for threshold, suffix in ((1e12, "T"), (1e9, "B"), (1e6, "M")):
-        if value >= threshold:
+        if abs(value) >= threshold:  # abs: net income can be a loss
             return f"{value / threshold:,.2f}{suffix}"
     return f"{value:,.0f}"
 
@@ -139,6 +152,121 @@ with tab_market:
                 )
                 if fundamentals.get("summary"):
                     st.caption(fundamentals["summary"])
+
+with tab_facts:
+    st.subheader("XBRL facts (DuckDB)")
+    st.caption(
+        "Annual 10-K figures, each tied to its filing and XBRL concept so it can be cited. "
+        "A ticker that isn't in DuckDB yet is fetched from the SEC once and saved, then served from DuckDB."
+    )
+
+    controls = st.columns([2, 2, 1])
+    facts_ticker = controls[0].text_input("Ticker", value="AAPL", key="facts_ticker").strip().upper()
+    facts_metric = controls[1].selectbox(
+        "Metric",
+        ["all", *FACT_METRICS],
+        format_func=lambda m: FACT_METRICS.get(m, "All metrics"),
+        key="facts_metric",
+    )
+    controls[2].markdown("&nbsp;", unsafe_allow_html=True)
+    controls[2].button("Load", type="primary", use_container_width=True, key="facts_load")
+
+    if facts_ticker:
+        query = "" if facts_metric == "all" else f"?metric={facts_metric}"
+        with st.spinner(f"Looking up {facts_ticker}..."):
+            payload, facts_error = fetch(f"/facts/{facts_ticker}{query}")
+
+        if facts_error:
+            st.error(facts_error)
+        elif not payload["facts"]:
+            st.info(f"No {FACT_METRICS.get(facts_metric, '')} facts for {payload['ticker']}.")
+        else:
+            kind, note = FACT_SOURCES[payload["source"]]
+            getattr(st, kind)(note)
+
+            facts = pd.DataFrame(payload["facts"])
+            facts["period_end"] = pd.to_datetime(facts["period_end"])
+            facts = facts.sort_values("period_end")
+            facts["fiscal_year"] = "FY" + facts["period_end"].dt.year.astype(str)  # named by the year it ends
+            present = [m for m in FACT_METRICS if m in set(facts["metric"])]
+
+            # Latest year per metric, with growth over the year before
+            headline = st.columns(len(present))
+            for column, metric in zip(headline, present):
+                series = facts[facts["metric"] == metric]
+                latest = series.iloc[-1]
+                previous = series.iloc[-2]["value"] if len(series) > 1 else None
+                growth = (latest["value"] - previous) / abs(previous) if previous else None
+                column.metric(
+                    f"{FACT_METRICS[metric]} · {latest['fiscal_year']}",
+                    f"{latest['value']:,.2f}" if latest["unit"] == "USD/shares" else compact(latest["value"]),
+                    delta=f"{growth:+.1%}" if growth is not None else None,
+                )
+
+            money = [m for m in present if m != "eps_diluted"]
+            charts = st.columns([3, 2]) if money and "eps_diluted" in present else [st.container()]
+            if money:
+                figure = go.Figure(
+                    [
+                        go.Bar(
+                            x=facts.loc[facts["metric"] == m, "fiscal_year"],
+                            y=facts.loc[facts["metric"] == m, "value"] / 1e9,
+                            name=FACT_METRICS[m],
+                        )
+                        for m in money
+                    ]
+                )
+                figure.update_layout(
+                    barmode="group",
+                    height=380,
+                    margin=dict(l=0, r=0, t=10, b=0),
+                    xaxis=dict(type="category", categoryorder="category ascending"),
+                    yaxis_title="USD billions",
+                    legend=dict(orientation="h"),
+                )
+                charts[0].plotly_chart(figure, use_container_width=True)
+            if "eps_diluted" in present:
+                eps = facts[facts["metric"] == "eps_diluted"]
+                figure = go.Figure(go.Scatter(x=eps["fiscal_year"], y=eps["value"], mode="lines+markers"))
+                figure.update_layout(
+                    height=380,
+                    margin=dict(l=0, r=0, t=10, b=0),
+                    xaxis=dict(type="category"),
+                    yaxis_title="Diluted EPS (USD)",
+                )
+                charts[-1].plotly_chart(figure, use_container_width=True)
+                charts[-1].caption("As reported in each 10-K, not split-adjusted: a stock split shows up as a drop.")
+
+            st.dataframe(
+                facts.sort_values(["period_end", "metric"], ascending=[False, True]).assign(
+                    period_end=facts["period_end"].dt.date,
+                    metric=facts["metric"].map(FACT_METRICS),
+                    citation=facts["citation"].map(lambda c: c.get("kind")),
+                )[["period_end", "metric", "value", "unit", "doc_id", "concept", "tier", "citation"]],
+                column_config={
+                    "period_end": "Period end",
+                    "metric": "Metric",
+                    "value": st.column_config.NumberColumn("Value", format="localized"),
+                    "unit": "Unit",
+                    "doc_id": "Filing (accession)",
+                    "concept": "XBRL concept",
+                    "tier": "Tier",
+                    "citation": "Citation",
+                },
+                use_container_width=True,
+                hide_index=True,
+            )
+            st.caption(f"{payload['count']} facts · source: {payload['source']} · latency: {payload['latency_ms']} ms")
+
+            with st.expander("One fact as the API returns it"):
+                st.json(payload["facts"][0])
+
+    with st.expander("Tickers already in DuckDB"):
+        tickers, tickers_error = fetch("/facts")
+        if tickers_error:
+            st.warning(tickers_error)
+        else:
+            st.dataframe(pd.DataFrame(tickers), use_container_width=True, hide_index=True)
 
 with tab1:
     st.subheader("Credit-default prediction")

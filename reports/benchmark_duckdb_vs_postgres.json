@@ -1,0 +1,72 @@
+{
+  "table": "sec_fsds_all",
+  "rows": 3551230,
+  "runs": 5,
+  "duckdb_version": "2.0.0",
+  "postgres_settings": {
+    "server_version": "16.15",
+    "shared_buffers": "128MB",
+    "max_parallel_workers_per_gather": "2"
+  },
+  "sizes": {
+    "duckdb_file_bytes": 183250944,
+    "postgres_table_bytes": 1200234496,
+    "postgres_table_with_indexes_bytes": 1296392192
+  },
+  "results": [
+    {
+      "query": "Count every number",
+      "kind": "full scan",
+      "sql": "SELECT count(*) FROM sec_fsds_all",
+      "duckdb_ms": 0.61,
+      "postgres_ms": 97.41,
+      "faster": "duckdb",
+      "times_faster": 159.4
+    },
+    {
+      "query": "Top 10 tags by count",
+      "kind": "group by",
+      "sql": "SELECT tag, count(*) AS n FROM sec_fsds_all GROUP BY tag ORDER BY n DESC, tag LIMIT 10",
+      "duckdb_ms": 33.44,
+      "postgres_ms": 255.5,
+      "faster": "duckdb",
+      "times_faster": 7.6
+    },
+    {
+      "query": "Largest annual revenue per company",
+      "kind": "filter + group by",
+      "sql": "SELECT company, max(value) AS revenue FROM sec_fsds_all WHERE tag IN ('Revenues', 'RevenueFromContractWithCustomerExcludingAssessedTax') AND quarters = 4 AND segments IS NULL GROUP BY company ORDER BY revenue DESC, company LIMIT 10",
+      "duckdb_ms": 44.21,
+      "postgres_ms": 163.68,
+      "faster": "duckdb",
+      "times_faster": 3.7
+    },
+    {
+      "query": "Distinct companies and tags",
+      "kind": "distinct count",
+      "sql": "SELECT count(DISTINCT cik) AS companies, count(DISTINCT tag) AS tags FROM sec_fsds_all",
+      "duckdb_ms": 28.89,
+      "postgres_ms": 5423.1,
+      "faster": "duckdb",
+      "times_faster": 187.7
+    },
+    {
+      "query": "Numbers and average value per form and unit",
+      "kind": "multi-column group by",
+      "sql": "SELECT form, unit, count(*) AS n, avg(value) AS mean FROM sec_fsds_all GROUP BY form, unit ORDER BY n DESC, form, unit LIMIT 10",
+      "duckdb_ms": 19.21,
+      "postgres_ms": 498.82,
+      "faster": "duckdb",
+      "times_faster": 26.0
+    },
+    {
+      "query": "One company's revenue history",
+      "kind": "index lookup",
+      "sql": "SELECT value_date, value FROM sec_fsds_all WHERE ticker = 'NFLX' AND tag = 'Revenues' AND segments IS NULL ORDER BY value_date, value",
+      "duckdb_ms": 14.57,
+      "postgres_ms": 0.1,
+      "faster": "postgres",
+      "times_faster": 142.9
+    }
+  ]
+}
