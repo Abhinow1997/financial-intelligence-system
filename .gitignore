@@ -24,6 +24,9 @@ htmlcov/
 *.pem
 *.key
 secrets/
+# Snowflake connection files hold tokens (PATs)
+.snowflake/
+connections.toml
 
 # --- Data lake (keep dirs via .gitkeep, ignore contents) ---
 data/raw/*
