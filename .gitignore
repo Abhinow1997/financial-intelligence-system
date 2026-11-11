@@ -52,6 +52,9 @@ logs/*
 config/airflow.cfg
 plugins/__pycache__/
 
+# --- GitHub Agentic Workflows (Lab 7): local run logs from `gh aw logs` / `gh aw audit` ---
+.github/aw/logs/
+
 # --- Notebooks ---
 .ipynb_checkpoints/
 

@@ -3,6 +3,12 @@
 ## What & why
 <!-- One or two sentences. Link the issue: Closes #___ -->
 
+Task: #___
+<!-- For a frontend/backend task issue (label `task`): the code reviewer checks this PR against
+     .github/review-rules.md and closes the task when the merged code passes. Use "Task: #N"
+     rather than "Closes #N" for those, so the task only closes if the rules pass. -->
+
+
 ## Release / area
 - [ ] R1 Data+Predict  [ ] R2 Generate+Ground  [ ] R3 Tool+Agentify
 - [ ] R4 Evaluate+Validate  [ ] R5 Attack+Harden  [ ] R6 Control+Deploy
