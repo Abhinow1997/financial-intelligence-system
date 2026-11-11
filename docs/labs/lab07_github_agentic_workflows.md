@@ -4,8 +4,8 @@
 > first explains every pull request in plain English. The second reviews frontend and backend
 > pull requests against a written rulebook, and closes the linked task only when the merged code
 > follows the rules. Then you will try to trick the reviewer, and explain why the trick failed.
-> **Time:** ~120 min · **Prereqs:** [Lab 0](lab00_git_workflow.md), [Lab 1](lab01_fastapi_yfinance.md), a GitHub account with Copilot
-> (free with the [Student Developer Pack](https://education.github.com/pack)), your own fork of this repo
+> **Time:** ~120 min · **Prereqs:** [Lab 0](lab00_git_workflow.md), [Lab 1](lab01_fastapi_yfinance.md), your own fork of this repo,
+> and an [Anthropic API](https://console.anthropic.com) account with a few dollars of credit (each run costs about $0.01)
 > **You produce:** one merged PR that adds a rule to the rulebook, a task issue closed by the reviewer, and your red-team findings.
 
 By the end you can: explain how an agentic workflow differs from a normal Action; read and
@@ -92,26 +92,31 @@ gh auth login --scopes repo,workflow
 
 Run the script again. It installs the `gh aw` extension (pinned to v1.2.2) and checks the repository.
 
-**Give the agent a model.** The default engine is GitHub Copilot, which authenticates with a
-*fine-grained personal access token* that may only make Copilot requests:
+**Give the agent a model.** This lab's helpers run on **Claude Code** with **Claude Haiku 5.5**
+(`claude-haiku-5-5`), Anthropic's cheapest current model: $0.10 per million input tokens and $0.50
+per million output tokens. A run of either helper costs about **1 AI credit ≈ $0.01**. It
+authenticates with an Anthropic API key:
 
-1. Go to github.com → **Settings → Developer settings → Personal access tokens → Fine-grained tokens → Generate new token**.
-2. Set the expiry to the end of the semester. Under **Account permissions**, set **Copilot Requests** to *Read-only*. Grant nothing else.
+1. Go to **console.anthropic.com** and sign in. Under **Billing**, add a few dollars of credit. API
+   usage is pay-as-you-go and separate from any Claude.ai subscription.
+2. Under **API Keys → Create Key**, copy the key (it starts with `sk-ant-`).
 3. Store it as a secret in your fork, pasting it when prompted:
 
 ```bash
-gh aw secrets set COPILOT_GITHUB_TOKEN
+gh aw secrets set ANTHROPIC_API_KEY
 ```
 
 ```bash
 gh aw secrets bootstrap --non-interactive
 ```
 
-The second command should report no missing secrets. **Never** paste the token into a file, an
-issue, or a chat. If you leak it, revoke it on the same settings page.
+The second command should show `✓ ANTHROPIC_API_KEY`. **Never** paste the key into a file, an issue,
+or a chat. If you leak it, delete it in the Console. A Claude.ai Pro/Max login token
+(`CLAUDE_CODE_OAUTH_TOKEN`) does not work here; it must be an API key.
 
-> Copilot is not the only engine. `engine: claude` (with an `ANTHROPIC_API_KEY` secret) or
-> `engine: codex` (with `OPENAI_API_KEY`) work the same way. Change one line and recompile.
+> Claude is not the only engine. `engine: copilot` (with a `COPILOT_GITHUB_TOKEN` fine-grained token,
+> on an account whose Copilot plan allows automation; Copilot Free gets a 401) or `engine: codex`
+> (with `OPENAI_API_KEY`) work the same way. Change the `engine:` block and recompile.
 
 ---
 
@@ -127,6 +132,9 @@ The file has two parts. **The frontmatter** (between the `---` lines) is the *co
 compiler and GitHub enforce it, not the model:
 
 ```yaml
+engine:                   # WHICH AI does the work
+  id: claude              #   Claude Code
+  model: claude-haiku-5-5 #   the cheapest current Claude model
 on:                       # WHEN it runs
   pull_request:
     types: [opened, reopened]
@@ -135,23 +143,34 @@ permissions:              # what the AGENT's token can READ (write is rejected a
   pull-requests: read
 tools:
   github:
-    mode: gh-proxy        # the agent uses the `gh` CLI, proxied, with the read-only token
+    mode: gh-proxy        # the agent's `gh` goes through a read-only proxy
     toolsets: [context, repos, pull_requests]
   bash: [cat, grep, find, head, wc, ls, "git diff", "git log"]   # read-only shell commands only
 network:
   allowed: []             # no internet
 timeout-minutes: 10       # hard stop on the agent step
 max-ai-credits: 80        # hard stop on spend (1 AIC = $0.01). The default is 1000
+steps:                    # a plain script that runs BEFORE the AI, outside its sandbox
+  - name: Save the pull request's facts for the agent
+    run: |                #   (abridged) writes pr.json and pr.diff to /tmp/gh-aw/pr/
+      gh pr view "$PR_NUMBER" --json number,title,body,state,mergedAt,files > /tmp/gh-aw/pr/pr.json
+      gh pr diff "$PR_NUMBER" > /tmp/gh-aw/pr/pr.diff
 safe-outputs:             # the ONLY writes this workflow can ever make
   staged: true            #   preview mode: show, do not do
   add-comment:
     max: 1
 ```
 
+**Why the `steps:` block?** Inside the sandbox, the `gh` proxy cannot return a pull request's diff,
+file list or merge state (it answers `"files": null`, `"mergedAt": null`). So a deterministic script
+fetches them first, with GitHub's normal `gh`, and saves them as files the AI only has to `cat`. That
+is the rule of thumb for every agentic workflow: **deterministic where you can, agentic where you must.**
+
 **The body** (after the second `---`) is the *prompt*, in plain Markdown. Notice three habits you
 will see in every good workflow:
 
-- it says exactly **what to read** (`gh pr view`, `gh pr diff`);
+- it says exactly **what to read** (`/tmp/gh-aw/pr/pr.json` and `pr.diff`), one simple command at a
+  time, because pipes and `;` chains are blocked by the shell allowlist;
 - it says exactly **what to output** (three sections, under 150 words);
 - it says **when to do nothing**: call `noop` for an empty PR. A run that correctly does nothing
   is a success, and `noop` records why.
@@ -172,7 +191,8 @@ Open `fis-pr-summary.lock.yml` and skim it. It is ~2,200 lines of ordinary Actio
 
 - `jobs:` → `pre_activation`, `activation`, `agent`, `detection`, `safe_outputs`, `conclusion`;
 - every `uses:` pinned to a **40-character commit SHA**, not a tag (supply-chain hygiene);
-- the `--allow-tool shell(...)` list: the commands the agent may run.
+- the `--allowed-tools 'Bash(cat),Bash(grep),…'` list: the commands Claude may run. Your `bash:`
+  allowlist plus a small safe default set (`echo`, `date`, `sort`…). Anything else is denied.
 
 The compiler is also a **security linter**, and it is strict by default. See for yourself: in
 `fis-pr-summary.md`, change `pull-requests: read` to `pull-requests: write` and run
@@ -404,8 +424,9 @@ run, in **merge mode**: it re-checks the merged change, comments `✅ Completed 
 Had the merged code still broken a rule, the task would have stayed open with `needs-follow-up`
 and a list of what to fix. "Merged" and "done" are no longer the same thing.
 
-> **Order matters.** Merge mode reads `mergedAt` with `gh pr view`. A PR closed without merging
-> gets `noop` ("Closed without merge"), and the task is untouched.
+> **Order matters.** Merge mode reads `mergedAt` from `/tmp/gh-aw/pr/pr.json`, saved by the step
+> before the AI runs. A PR closed without merging gets `noop` ("Closed without merge"), and the task
+> is untouched. A merged PR with no `Task: #N` gets `noop` ("Merged, but no task linked").
 
 ---
 
@@ -488,10 +509,16 @@ access. Argue in your PR whether the extra credential is worth it.
 - **`gh: command not found` right after installing** → open a new terminal (PATH is read at
   start-up). On Windows the binary is `C:\Program Files\GitHub CLI\gh.exe`.
 - **The setup script says you are not signed in** → run `gh auth login --scopes repo,workflow`, then run the script again.
-- **Run fails at "Validate COPILOT_GITHUB_TOKEN secret"** → the secret is missing or misnamed
-  in *this* repository (forks do not inherit secrets). Run `gh aw secrets bootstrap`.
-- **Agent step fails with 401/403 from Copilot** → the token lacks *Copilot Requests* permission,
-  has expired, or your Copilot plan is inactive. Regenerate it.
+- **Every job fails within a few seconds with "account is locked due to a billing issue"** → a GitHub
+  account problem, not the lab. Check github.com/settings/billing, your email, or contact GitHub Support.
+- **Run fails at "Validate ANTHROPIC_API_KEY secret"** → the secret is missing or misnamed in *this*
+  repository (forks do not inherit secrets). Run `gh aw secrets bootstrap`.
+- **Agent step fails with an Anthropic `401 authentication_error`, or a credit/billing error** → the key is
+  wrong or deleted, or the Anthropic account has no credit left. Check console.anthropic.com, then re-run
+  `gh aw secrets set ANTHROPIC_API_KEY`. A Claude.ai login token (`CLAUDE_CODE_OAUTH_TOKEN`) is not supported.
+- **The AI says it "could not complete the task" (`report_incomplete`)** → read its reason with
+  `gh aw audit <run-id>`. If it could not see the change, check that the step "Save the pull request's
+  facts for the agent" ran and printed a line count.
 - **The reviewer did not run** → the PR touches nothing under `services/frontend/` or
   `services/backend/` (that is its `paths:` filter), the PR comes from someone else's fork (blocked by
   default), or the person who opened it lacks write access (see below).
@@ -516,6 +543,7 @@ access. Argue in your PR whether the extra credential is worth it.
 
 ```yaml
 ---
+engine: { id: claude, model: claude-haiku-5-5 }   # needs the ANTHROPIC_API_KEY secret
 on:
   pull_request:
     types: [opened, synchronize, reopened, closed]
@@ -527,6 +555,9 @@ tools:
 network: { allowed: [] }                # or exact domains, never "*"
 timeout-minutes: 10
 max-ai-credits: 200
+steps:                                  # deterministic prep, runs before the AI, outside the sandbox
+  - run: gh pr diff "$PR_NUMBER" > /tmp/gh-aw/pr/pr.diff
+    env: { GH_TOKEN: "${{ github.token }}", PR_NUMBER: "${{ github.event.pull_request.number }}" }
 safe-outputs:                           # the only writes, and their limits
   staged: true                          # preview first
   add-comment: { max: 1, target: "*", hide-older-comments: true }
@@ -544,13 +575,16 @@ gh aw logs -c 5                         # recent runs: tokens, AIC, outcome
 gh aw audit <run-id>                    # one run: prompt, tool calls, outputs, firewall
 gh aw forecast                          # projected AIC spend
 gh aw add githubnext/agentics/<name>    # install a sample workflow
-gh aw secrets set COPILOT_GITHUB_TOKEN  # store the engine token
+gh aw secrets set ANTHROPIC_API_KEY     # store the engine key
+gh aw models                            # model IDs and their per-token prices
 ```
 
 ### Glossary
 
 **agentic workflow** a Markdown-defined Action whose main step is an AI agent · **lock file** the
-compiled `.lock.yml` that GitHub actually runs · **engine** the agent CLI (Copilot, Claude, Codex) ·
+compiled `.lock.yml` that GitHub actually runs · **engine** the agent CLI that does the work (here Claude Code
+running Claude Haiku 5.5; Copilot and Codex are alternatives) · **deterministic step** a plain `steps:` script
+that runs before the AI, outside its sandbox ·
 **safe output** a pre-declared, validated write (comment, review, label, close…) applied by a separate job ·
 **staged** safe outputs previewed, not applied · **`noop`** an explicit "nothing to do" result ·
 **rulebook** `.github/review-rules.md`, the human-written rules the reviewer applies ·

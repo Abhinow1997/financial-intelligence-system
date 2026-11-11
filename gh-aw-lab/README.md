@@ -2,8 +2,8 @@
 
 GitHub Agentic Workflows let you write a GitHub Actions automation **in Markdown**: a YAML
 header that says *when it runs and what it may touch*, and a plain-English body that says
-*what to do*. An AI coding agent (GitHub Copilot by default) does the work inside a locked-down
-sandbox, and only the write actions you allowlisted ever reach your repository.
+*what to do*. An AI coding agent (in this lab, Claude Code running Claude Haiku 5.5) does the work
+inside a locked-down sandbox, and only the write actions you allowlisted ever reach your repository.
 
 > Think of it as **"CI for judgment calls"**. Plain Actions run the steps you scripted. Agentic
 > workflows handle the jobs you could never script: "what does this PR actually change?",
@@ -55,8 +55,10 @@ flowchart LR
     A --> AG
 
     subgraph AG["agent job (read-only token)"]
+        direction TB
+        S["your steps:<br/>save PR facts to files"] --> FW
         subgraph FW["Agent Workflow Firewall (container)"]
-            C["Copilot CLI<br/>+ your prompt"] --- MCP["MCP gateway<br/>github (read), safeoutputs"]
+            C["Claude Code (Haiku 5.5)<br/>+ your prompt"] --- MCP["MCP gateway<br/>github (read), safeoutputs"]
         end
     end
 
@@ -98,17 +100,17 @@ Rule of thumb from the gh-aw docs: **deterministic where you can, agentic where 
 
 1. Install the tools: run `scripts/setup-windows.ps1` (PowerShell) or `scripts/setup.sh` (macOS / Linux / WSL).
 2. Sign in: `gh auth login --scopes repo,workflow`.
-3. Create a **fine-grained personal access token** for the Copilot engine:
-   - Go to github.com → Settings → Developer settings → Fine-grained tokens → Generate new token.
-   - Under **Account permissions**, set **Copilot Requests** to *Read-only*. No repository access is needed.
-   - Store it as a repo secret: `gh aw secrets set COPILOT_GITHUB_TOKEN`. Paste the token when
-     prompted; it never touches a file.
-   - Students on the GitHub Student Developer Pack get Copilot at no cost, so their runs bill
-     against their own Copilot plan.
+3. Create an **Anthropic API key** for the Claude engine:
+   - Go to console.anthropic.com. Under **Billing**, add a few dollars of credit (pay-as-you-go,
+     separate from any Claude.ai subscription). Under **API Keys**, create a key.
+   - Store it as a repo secret: `gh aw secrets set ANTHROPIC_API_KEY`. Paste the key when prompted;
+     it never touches a file. Every fork needs its own secret, because forks do not inherit secrets.
 4. Check the setup: `gh aw secrets bootstrap --non-interactive` lists any secret that is still missing.
-5. Set up the repository for gh-aw, from the repo root: `gh aw init --engine copilot --no-mcp`. It marks
-   lock files as generated in `.gitattributes` and adds a Copilot helper agent (`.github/agents/`) and
-   skill (`.github/skills/`) that use the house rules in `.github/aw/instructions.md`.
+5. Set up the repository for gh-aw, from the repo root: `gh aw init --engine claude`. It marks lock
+   files as generated in `.gitattributes` and adds the `agentic-workflows` skill (`.github/skills/`),
+   which follows the house rules in `.github/aw/instructions.md`. (This repo also has
+   `.github/agents/agentic-workflows.md` from an earlier `--engine copilot` init: an optional Copilot
+   Chat helper for writing workflows in VS Code.)
 6. Compile the two examples: `gh aw compile --strict`. This creates `fis-pr-summary.lock.yml` and
    `fis-code-review.lock.yml`, the files GitHub actually runs. It must finish with 0 errors and 0 warnings.
 7. Commit everything `init` and `compile` produced together with the `.md` files, then merge. The
@@ -123,11 +125,15 @@ Things to know for the shared course repository (students' own forks and team re
   from **someone else's fork** are blocked by default. Lab 0's flow (branches inside your fork or team
   repo) is unaffected. Opening it wider (`roles: all`, `forks: [...]` under `on:`) exposes the agent to
   anyone's prompt injection, and spends AI credits on every push.
-- **Cost.** The reviewer runs on every push to a frontend/backend PR, capped at 200 AI credits ($2) per
-  run; the explainer runs once per PR, capped at 80. Check real spend with `gh aw logs` and `gh aw forecast`.
+- **Cost.** Both helpers use Claude Haiku 5.5 (`claude-haiku-5-5`, $0.10 / $0.50 per million input /
+  output tokens). Measured runs cost about 1 AI credit (≈ $0.01) each, billed to the Anthropic account
+  behind `ANTHROPIC_API_KEY`. The reviewer runs on every push to a frontend/backend PR, capped at 200 AI
+  credits ($2) per run; the explainer runs once per PR, capped at 80. Check real spend with `gh aw logs`
+  and `gh aw forecast`.
 
-Switching engines is one line of frontmatter, for example `engine: claude` with an
-`ANTHROPIC_API_KEY` secret. Recompile after any frontmatter change.
+Switching engines or models is a frontmatter change: edit the `engine:` block (for example
+`model: claude-sonnet-5-5` for a more capable reviewer, or `id: copilot` with a `COPILOT_GITHUB_TOKEN`
+secret), then recompile. `gh aw models` lists model IDs and prices.
 
 ## References
 

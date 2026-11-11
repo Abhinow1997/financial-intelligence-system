@@ -58,6 +58,6 @@ Write-Host "== 4/4 Repository check (run from the repo root)" -ForegroundColor C
 & $gh aw secrets bootstrap --non-interactive
 
 Write-Host ""
-Write-Host "Done. If COPILOT_GITHUB_TOKEN is listed as missing, create a fine-grained token with" -ForegroundColor Green
-Write-Host "Account permissions > Copilot Requests = Read-only, then run:  gh aw secrets set COPILOT_GITHUB_TOKEN" -ForegroundColor Green
+Write-Host "Done. If ANTHROPIC_API_KEY is listed as missing, create an API key at console.anthropic.com" -ForegroundColor Green
+Write-Host "(Billing needs a few dollars of credit), then run:  gh aw secrets set ANTHROPIC_API_KEY" -ForegroundColor Green
 exit 0
