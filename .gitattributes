@@ -7,3 +7,5 @@
 *.png binary
 *.jpg binary
 *.pdf binary
+
+.github/workflows/*.lock.yml linguist-generated=true
