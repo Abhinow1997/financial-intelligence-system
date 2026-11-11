@@ -2,6 +2,9 @@
 emoji: 🔍
 description: Review frontend/backend pull requests against .github/review-rules.md, report each rule on the PR, and close the linked task issue when compliant code is merged (Lab 7, example 2).
 intent: Every frontend/backend change is checked against the team's written rules before a human approves it, and a task only counts as done when the merged code actually follows those rules.
+engine:
+  id: claude
+  model: claude-haiku-5-5
 on:
   pull_request:
     types: [opened, synchronize, reopened, closed]

@@ -1,6 +1,10 @@
 ---
+emoji: 📝
 description: When a pull request is opened, post one plain-English comment explaining what it changes and how to test it (Lab 7, example 1).
 intent: Help reviewers understand any pull request in under a minute, without the bot changing anything. Make the comment short and factual explain its impact, changes and summary of what changes it will have on the system.
+engine:
+  id: claude
+  model: claude-haiku-5-5
 on:
   pull_request:
     types: [opened, reopened]
