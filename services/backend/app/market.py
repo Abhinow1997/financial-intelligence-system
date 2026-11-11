@@ -274,3 +274,4 @@ def compare(req: CompareRequest) -> CompareResponse:
         best=rows[0].ticker,
         latency_ms=_elapsed_ms(started),
     )
+# Every response carries latency_ms so the dashboard can show how slow the upstream was.
