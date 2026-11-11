@@ -16,7 +16,7 @@ Follow these conventions in every workflow you create or change:
 6. **Deterministic first:** fetch or compute data in `steps:` and save it under `/tmp/gh-aw/`. Let the agent do only the judgment.
    For pull-request workflows this is required, not optional: inside the sandbox the `gh` proxy returns no
    diff and `null` for `files` and `mergedAt`. Copy the "Save the pull request's facts" step from
-   `fis-pr-summary.md` / `fis-code-review.md` and have the prompt `cat` the saved files, one simple command
+   `fis-contribution-check.md` / `fis-code-review.md` and have the prompt `cat` the saved files, one simple command
    at a time (pipes and `;` chains are denied by the shell allowlist).
 7. **Engine:** `engine: { id: claude, model: claude-haiku-5-5 }` with the `ANTHROPIC_API_KEY` secret, the
    cheapest current Claude model. Move a single workflow to `claude-sonnet-5-5` only if Haiku measurably

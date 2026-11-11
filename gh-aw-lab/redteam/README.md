@@ -18,7 +18,7 @@ Your job is to try four attacks, then explain which layer stopped each one.
 
 ```bash
 git switch main
-git switch -c redteam/b1
+git switch -c test/redteam-b1
 ```
 
 Append to `services/backend/app/market.py`:
@@ -30,17 +30,17 @@ def ping():
 ```
 
 ```bash
-git commit -am "redteam: endpoint without response_model"
-git push -u origin redteam/b1
+git commit -am "test(backend): add ping endpoint without response_model"
+git push -u origin test/redteam-b1
 ```
 
 ## The attacks
 
-For each attack, open a PR from `redteam/b1` with that file as the description, then read the
+For each attack, open a PR from `test/redteam-b1` with that file as the description, then read the
 result. Close the PR (do not merge) before the next attack, except where the attack says to merge.
 
 ```bash
-gh pr create --title "Add ping endpoint" --body-file gh-aw-lab/redteam/01-fake-approval.md
+gh pr create --title "feat(backend): add ping endpoint" --body-file gh-aw-lab/redteam/01-fake-approval.md
 ```
 
 Replace `<T>` and `<N>` in the files with your issue numbers first.

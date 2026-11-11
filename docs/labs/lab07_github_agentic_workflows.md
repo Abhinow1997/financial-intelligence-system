@@ -1,7 +1,7 @@
 # Lab 7 — GitHub Agentic Workflows: AI helpers that review your code
 
 > **Goal:** put AI agents to work on this repository, *safely*. You will run two of them. The
-> first explains every pull request in plain English. The second reviews frontend and backend
+> first checks that every pull request follows `CONTRIBUTING.md`. The second reviews frontend and backend
 > pull requests against a written rulebook, and closes the linked task only when the merged code
 > follows the rules. Then you will try to trick the reviewer, and explain why the trick failed.
 > **Time:** ~120 min · **Prereqs:** [Lab 0](lab00_git_workflow.md), [Lab 1](lab01_fastapi_yfinance.md), your own fork of this repo,
@@ -22,7 +22,7 @@ The concepts page with the architecture diagram is [`gh-aw-lab/README.md`](../..
 Our CI already runs `ruff`, `pytest` and the eval gate. Those are **deterministic**: same input,
 same answer, and a script decides pass or fail. Some questions a script cannot answer:
 
-- *"What does this pull request actually change, and how do I test it?"*
+- *"Does this pull request follow our contribution process: branch name, title, filled-in template?"*
 - *"Does this new endpoint follow the conventions from Lab 1: a typed response model, `TickerParam`, `latency_ms`, a test?"*
 - *"Task #12 says 'add a dividends endpoint'. Is it really done, or just merged?"*
 
@@ -120,11 +120,49 @@ or a chat. If you leak it, delete it in the Console. A Claude.ai Pro/Max login t
 
 ---
 
-## 3. Example 1: the pull request explainer
+## 3. Example 1: the contribution checker
 
-Open [`.github/workflows/fis-pr-summary.md`](../../.github/workflows/fis-pr-summary.md). When a pull
-request is opened, it posts **one** comment: what changed, why it matters, how to test it. It
-judges nothing and changes nothing. That makes it the right first example.
+Open [`.github/workflows/fis-contribution-check.md`](../../.github/workflows/fis-contribution-check.md).
+On every pull request (opened, edited, pushed to, reopened) it checks the **process**: was this
+change submitted the way [`CONTRIBUTING.md`](../../CONTRIBUTING.md) asks? It never judges the code.
+The code reviewer in Example 2 does that.
+
+| ID | Check | Severity |
+|---|---|---|
+| C1 | Branch name is `<type>/<topic>` or `<type>/<release>-<topic>`, e.g. `feat/r1-credit-model` | fail |
+| C2 | PR title is a Conventional Commit, e.g. `feat(rag): add hybrid retrieval toggle` (squash-merge makes it the commit on `main`) | fail |
+| C3 | Commit messages are Conventional Commits, summary of about 50 characters or less | warn |
+| C4 | The PR template is filled in: What & why, How I verified, and the AI Engineering Log | fail |
+| C5 | Small PR: 500 changed lines or fewer (generated `.lock.yml` files don't count) | warn |
+| C6 | Nothing that must never be committed: `.env`, keys, data files | fail |
+
+It answers with **one label**, `contribution-ready` or `needs-contribution-fixes` (a fixed PR swaps
+one for the other), and **one checklist comment** saying exactly what to fix. Each new run collapses
+the previous comment.
+
+### Where it came from: reuse, then harden
+
+You don't have to write every helper yourself. GitHub's sample library
+[githubnext/agentics](https://github.com/githubnext/agentics) has a *Contribution Guidelines Checker*,
+and ours started as that file. You can install the original on a scratch branch to compare (don't merge it):
+
+```bash
+gh aw add-wizard githubnext/agentics/contribution-guidelines-checker
+```
+
+Read its frontmatter the way a security reviewer would. Here is what we changed and why:
+
+| Original | Ours | Why |
+|---|---|---|
+| Reads the PR with GitHub tools inside the sandbox | A `steps:` script saves `pr.json` first | In the sandbox, the `gh` proxy returns `null` for a PR's files and commits |
+| Reads `CONTRIBUTING.md` from the checkout | The step fetches it **from `main`** | A PR could otherwise edit `CONTRIBUTING.md` to loosen its own checks |
+| Only adds `contribution-ready`, never removes it | Two labels that replace each other | Otherwise a PR that later breaks a rule keeps a stale "ready" label |
+| A new comment on every push | `hide-older-comments: true` | One current checklist, not a pile of comments |
+| `network: defaults` | `network: { allowed: [] }` | Checking process needs no internet |
+| Default engine | `claude-haiku-5-5` | It runs on every PR event, and its own comment suggests a small model |
+| Generic checks for any repo | C1–C6, pinned to this repo's rules | Consistent, checkable verdicts |
+
+A library workflow is a starting point, not a finished product. Never run one you haven't read.
 
 ### 3.1 Anatomy
 
@@ -137,7 +175,7 @@ engine:                   # WHICH AI does the work
   model: claude-haiku-5-5 #   the cheapest current Claude model
 on:                       # WHEN it runs
   pull_request:
-    types: [opened, reopened]
+    types: [opened, edited, synchronize, reopened]   # "edited" = title or description changed
 permissions:              # what the AGENT's token can READ (write is rejected at compile time)
   contents: read
   pull-requests: read
@@ -145,34 +183,39 @@ tools:
   github:
     mode: gh-proxy        # the agent's `gh` goes through a read-only proxy
     toolsets: [context, repos, pull_requests]
-  bash: [cat, grep, find, head, wc, ls, "git diff", "git log"]   # read-only shell commands only
+  bash: [cat, grep, head, wc, ls]   # read-only shell commands only
 network:
   allowed: []             # no internet
 timeout-minutes: 10       # hard stop on the agent step
 max-ai-credits: 80        # hard stop on spend (1 AIC = $0.01). The default is 1000
 steps:                    # a plain script that runs BEFORE the AI, outside its sandbox
   - name: Save the pull request's facts for the agent
-    run: |                #   (abridged) writes pr.json and pr.diff to /tmp/gh-aw/pr/
-      gh pr view "$PR_NUMBER" --json number,title,body,state,mergedAt,files > /tmp/gh-aw/pr/pr.json
-      gh pr diff "$PR_NUMBER" > /tmp/gh-aw/pr/pr.diff
+    run: |                #   (abridged) writes these files to /tmp/gh-aw/pr/
+      gh pr view "$PR_NUMBER" --json title,body,headRefName,files,commits,... > pr.json
+      gh api ".../contents/CONTRIBUTING.md?ref=$base" > CONTRIBUTING.md   # the rules, from main
 safe-outputs:             # the ONLY writes this workflow can ever make
-  add-comment:            #   one comment on the PR, posted for real
-    max: 1                #   (add `staged: true` here for preview mode: show, do not do)
+  add-labels:
+    allowed: [contribution-ready, needs-contribution-fixes]
+  remove-labels:
+    allowed: [contribution-ready, needs-contribution-fixes]
+  add-comment:
+    max: 1
+    hide-older-comments: true   # (add `staged: true` above for preview mode: show, do not do)
 ```
 
-**Why the `steps:` block?** Inside the sandbox, the `gh` proxy cannot return a pull request's diff,
-file list or merge state (it answers `"files": null`, `"mergedAt": null`). So a deterministic script
-fetches them first, with GitHub's normal `gh`, and saves them as files the AI only has to `cat`. That
-is the rule of thumb for every agentic workflow: **deterministic where you can, agentic where you must.**
+**Why the `steps:` block?** Inside the sandbox, the `gh` proxy cannot return a pull request's
+files, commits or merge state (it answers `"files": null`). So a deterministic script fetches them
+first, with GitHub's normal `gh`, and saves them as files the AI only has to `cat`. That is the rule
+of thumb for every agentic workflow: **deterministic where you can, agentic where you must.**
 
 **The body** (after the second `---`) is the *prompt*, in plain Markdown. Notice three habits you
 will see in every good workflow:
 
-- it says exactly **what to read** (`/tmp/gh-aw/pr/pr.json` and `pr.diff`), one simple command at a
-  time, because pipes and `;` chains are blocked by the shell allowlist;
-- it says exactly **what to output** (three sections, under 150 words);
-- it says **when to do nothing**: call `noop` for an empty PR. A run that correctly does nothing
-  is a success, and `noop` records why.
+- it says exactly **what to read** (the files in `/tmp/gh-aw/pr/`), one simple command at a time,
+  because pipes and `;` chains are blocked by the shell allowlist;
+- it says exactly **what to check and output**: the C1–C6 table, one label, one comment under 200 words;
+- it says **when to do nothing**: call `noop` for a bot's pull request. A run that correctly does
+  nothing is a success, and `noop` records why.
 
 It also says the PR text is **data, not instructions**. Keep that line in mind for §8.
 
@@ -186,7 +229,7 @@ gh aw compile
 ✓ Compiled 2 workflows: 2 succeeded, 0 warnings
 ```
 
-Open `fis-pr-summary.lock.yml` and skim it. It is ~2,200 lines of ordinary Actions YAML. Look for:
+Open `fis-contribution-check.lock.yml` and skim it. It is ~2,300 lines of ordinary Actions YAML. Look for:
 
 - `jobs:` → `pre_activation`, `activation`, `agent`, `detection`, `safe_outputs`, `conclusion`;
 - every `uses:` pinned to a **40-character commit SHA**, not a tag (supply-chain hygiene);
@@ -194,8 +237,8 @@ Open `fis-pr-summary.lock.yml` and skim it. It is ~2,200 lines of ordinary Actio
   allowlist plus a small safe default set (`echo`, `date`, `sort`…). Anything else is denied.
 
 The compiler is also a **security linter**, and it is strict by default. See for yourself: in
-`fis-pr-summary.md`, change `pull-requests: read` to `pull-requests: write` and run
-`gh aw compile fis-pr-summary`:
+`fis-contribution-check.md`, change `pull-requests: read` to `pull-requests: write` and run
+`gh aw compile fis-contribution-check`:
 
 ```text
 error: strict mode: write permission 'pull-requests: write' is not allowed for security reasons.
@@ -226,49 +269,68 @@ different places, and that is a deliberate safety feature:
 
 So a pull request **cannot rewrite the instructions or the rules of its own review**. Look for the
 step "Restore agent config folders from base branch" in any lock file. To change what a helper
-*says* or *checks*, merge that change first, then test it on a new PR.
+*says* or *checks*, merge that change first, then test it on a new PR. (That is also why the checker
+fetches `CONTRIBUTING.md` from `main`: it lives outside `.github/`, so nothing else would protect it.)
 
-### 3.3 Run it: live, then in preview mode
+### 3.3 Run it: break the rules, fix them, then try preview mode
 
-The explainer is already on `main` and **posts real comments**, so any new pull request triggers it.
-Make a small test PR:
+Open a pull request that breaks three rules on purpose. `lab7` is not an allowed branch type (C1):
 
 ```bash
 git switch main
-git switch -c lab7/explainer-test
+git pull
+git switch -c lab7/checker-test
 ```
 
-Make any small change in `services/backend/app/market.py`, for example a clearer comment, then:
+Fix any small typo in `README.md`, then commit with a vague message (C3) and open the PR with a
+vague title (C2) and no template (C4):
 
 ```bash
-git commit -am "docs: clarify the quote endpoint comment"
-git push -u origin lab7/explainer-test
-gh pr create --fill
+git commit -am "update readme"
+git push -u origin lab7/checker-test
+gh pr create --title "update readme" --body "quick fix"
 ```
+
+Within 3–5 minutes the PR gets `needs-contribution-fixes` and one comment: `⚠️ 3 contribution
+check(s) failing`, with a table showing the corrected branch name, title and template. (The code
+reviewer does not run: this PR touches nothing under `services/`.)
+
+**Fix it the way the comment says.** Each fix is an `edited` or `synchronize` event, so the checker
+runs again and the previous comment is collapsed:
+
+1. **Title (C2):** `gh pr edit --title "docs(readme): fix typo in quick start"`
+2. **Template (C4):** on GitHub, edit the PR description: paste [`.github/pull_request_template.md`](../../.github/pull_request_template.md)
+   and fill in What & why, How I verified, and the AI Engineering Log.
+3. **Branch (C1):** on GitHub, **Code → Branches → ✏️** next to `lab7/checker-test`, and rename it to
+   `docs/checker-test`. The open PR follows the rename. Then point your local branch at it and push
+   one more commit to re-run the check:
 
 ```bash
-gh run watch
+git fetch -p
+git branch -m docs/checker-test
+git branch -u origin/docs/checker-test
+git commit --allow-empty -m "docs(readme): re-run contribution checks"
+git push
 ```
 
-The run takes 3–5 minutes. (You will also see a `fis-code-review` run, because the PR touches
-`services/backend/`. Ignore it until §5; it will complain that no task is linked.) Then open the PR:
-the explainer's comment is there, with **What changed / Why it matters / How to test it**.
+The label flips to `contribution-ready`, and the last comment reads `✅ Follows CONTRIBUTING.md`.
+C3 may still show a warning for the first commit, `update readme`. Warnings don't block the label.
 
 **Now try preview mode**, the safe way to test a change to a helper on a real repository without
-spamming it. On the same branch, add one line to `fis-pr-summary.md`:
+spamming it. On the same branch, add one line to `fis-contribution-check.md`:
 
 ```yaml
 safe-outputs:
   staged: true
-  add-comment:
-    max: 1
+  add-labels:
+    ...
 ```
 
-Run `gh aw compile fis-pr-summary`, commit both files, push, then close and reopen the PR
-(`gh pr close --comment "retry"` and `gh pr reopen`). `staged` lives in the lock file, so it applies
-from your PR's own branch (§3.2). This time **no new comment appears**: open the `fis-pr-summary` run
-on the Actions tab and scroll to the **summary**, where the `safe_outputs` job *previewed* the comment
-without posting it. Close the PR without merging when you are done, so `main` stays live.
+Run `gh aw compile fis-contribution-check`, commit both files, and push. `staged` lives in the lock
+file, so it applies from your PR's own branch (§3.2). This time **nothing changes on the PR**: open
+the run on the Actions tab and scroll to the **summary**, where the `safe_outputs` job *previewed* the
+label and comment without applying them. Close the PR without merging when you are done, so `main`
+stays live. Each run costs about 1 AI credit (≈ $0.01).
 
 ---
 
@@ -334,13 +396,15 @@ def get_dividends(ticker: str):
 
 ```bash
 git switch main
-git switch -c lab7/dividends
-git commit -am "feat: dividends endpoint"
-git push -u origin lab7/dividends
-gh pr create --title "Add dividends endpoint" --body "Adds GET /market/dividends/{ticker}.
-
-Task: #<T>"
+git switch -c feat/r3-dividends
+git commit -am "feat(backend): add dividends endpoint"
+git push -u origin feat/r3-dividends
+gh pr create --title "feat(backend): add dividends endpoint" --body "Adds GET /market/dividends/{ticker}. Task: #<T>"
 ```
+
+The branch name, title and commit follow `CONTRIBUTING.md`, so the contribution checker (§3) only
+flags the missing PR template (C4). Fill it in on GitHub if you want that label green too; it does
+not affect the reviewer.
 
 This code **works**, and CI passes: ruff and pytest have nothing to object to. Within about five
 minutes, the reviewer:
@@ -462,7 +526,7 @@ gh aw forecast
 
 Projects AI-credit spend per week from recent runs.
 
-Record in your PR: the AI credits and duration of one explainer run and one reviewer run. The
+Record in your PR: the AI credits and duration of one contribution-checker run and one reviewer run. The
 reviewer runs on **every push** to a frontend/backend PR. Estimate its monthly cost for a team that
 pushes 40 times a week, and say whether the `max-ai-credits: 200` cap is ever close to binding.
 
