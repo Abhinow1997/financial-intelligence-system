@@ -111,8 +111,10 @@ Rule of thumb from the gh-aw docs: **deterministic where you can, agentic where 
    skill (`.github/skills/`) that use the house rules in `.github/aw/instructions.md`.
 6. Compile the two examples: `gh aw compile --strict`. This creates `fis-pr-summary.lock.yml` and
    `fis-code-review.lock.yml`, the files GitHub actually runs. It must finish with 0 errors and 0 warnings.
-7. Commit everything `init` and `compile` produced together with the `.md` files, then merge. Both
-   examples also run from a pull request's own branch, so students can try them before anything is merged.
+7. Commit everything `init` and `compile` produced together with the `.md` files, then merge. The
+   helpers' instructions and the rulebook are always read from `main` (a pull request cannot rewrite its
+   own reviewer), so they must be merged before any pull request can use them. Lock-file settings such as
+   `steps:` and `staged` do apply from a PR's own branch.
 
 Things to know for the shared course repository (students' own forks and team repos are unaffected):
 
