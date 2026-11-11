@@ -24,7 +24,7 @@ Both live where GitHub needs them, in [`.github/workflows/`](../.github/workflow
 
 | Example | Trigger | Allowed writes | What it teaches |
 |---|---|---|---|
-| **1.** [`fis-pr-summary`](../.github/workflows/fis-pr-summary.md): PR explainer | PR opened or reopened | 1 comment, starting in **staged** (preview) mode | Anatomy of a workflow, compile, lock files, staged mode |
+| **1.** [`fis-pr-summary`](../.github/workflows/fis-pr-summary.md): PR explainer | PR opened or reopened | 1 comment, posted live (students then try **staged** preview mode) | Anatomy of a workflow, compile, lock files, staged mode |
 | **2.** [`fis-code-review`](../.github/workflows/fis-code-review.md): code reviewer and task tracker | PR opened, pushed to, or closed, touching `services/frontend/` or `services/backend/` | 1 review (comment or request changes, **never approve**), up to 5 line comments, 4 status labels, 1 task comment, close 1 issue **only if labelled `task`** | Rules as data, PR reviews, linking work to tasks, tight write limits |
 
 Example 2 checks the human-written rulebook [`.github/review-rules.md`](../.github/review-rules.md).

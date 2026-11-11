@@ -156,9 +156,8 @@ steps:                    # a plain script that runs BEFORE the AI, outside its 
       gh pr view "$PR_NUMBER" --json number,title,body,state,mergedAt,files > /tmp/gh-aw/pr/pr.json
       gh pr diff "$PR_NUMBER" > /tmp/gh-aw/pr/pr.diff
 safe-outputs:             # the ONLY writes this workflow can ever make
-  staged: true            #   preview mode: show, do not do
-  add-comment:
-    max: 1
+  add-comment:            #   one comment on the PR, posted for real
+    max: 1                #   (add `staged: true` here for preview mode: show, do not do)
 ```
 
 **Why the `steps:` block?** Inside the sandbox, the `gh` proxy cannot return a pull request's diff,
@@ -229,9 +228,10 @@ So a pull request **cannot rewrite the instructions or the rules of its own revi
 step "Restore agent config folders from base branch" in any lock file. To change what a helper
 *says* or *checks*, merge that change first, then test it on a new PR.
 
-### 3.3 Run it: preview first, then live
+### 3.3 Run it: live, then in preview mode
 
-The explainer is already on `main`, so any new pull request triggers it. Make a small test PR:
+The explainer is already on `main` and **posts real comments**, so any new pull request triggers it.
+Make a small test PR:
 
 ```bash
 git switch main
@@ -251,15 +251,24 @@ gh run watch
 ```
 
 The run takes 3–5 minutes. (You will also see a `fis-code-review` run, because the PR touches
-`services/backend/`. Ignore it until §5; it will complain that no task is linked.) Open the
-`fis-pr-summary` run on the Actions tab and scroll to the **summary**. Because of
-`staged: true`, the `safe_outputs` job *previewed* the comment **without posting it**. This is how
-you test a new workflow on a real repository without spamming it.
+`services/backend/`. Ignore it until §5; it will complain that no task is linked.) Then open the PR:
+the explainer's comment is there, with **What changed / Why it matters / How to test it**.
 
-Now go live: delete the `staged: true` line (and its comment) from `fis-pr-summary.md`, run
-`gh aw compile fis-pr-summary`, commit both files on the same branch, push, then close and reopen
-the PR (`gh pr close --comment "retry"` and `gh pr reopen`). This time the comment appears on the PR.
-Close the PR without merging when you are done.
+**Now try preview mode**, the safe way to test a change to a helper on a real repository without
+spamming it. On the same branch, add one line to `fis-pr-summary.md`:
+
+```yaml
+safe-outputs:
+  staged: true
+  add-comment:
+    max: 1
+```
+
+Run `gh aw compile fis-pr-summary`, commit both files, push, then close and reopen the PR
+(`gh pr close --comment "retry"` and `gh pr reopen`). `staged` lives in the lock file, so it applies
+from your PR's own branch (§3.2). This time **no new comment appears**: open the `fis-pr-summary` run
+on the Actions tab and scroll to the **summary**, where the `safe_outputs` job *previewed* the comment
+without posting it. Close the PR without merging when you are done, so `main` stays live.
 
 ---
 
