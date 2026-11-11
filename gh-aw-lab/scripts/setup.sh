@@ -38,5 +38,5 @@ gh aw doctor || true
 gh aw secrets bootstrap --non-interactive || true
 
 echo
-echo "Done. If COPILOT_GITHUB_TOKEN is listed as missing, create a fine-grained token with"
-echo "Account permissions > Copilot Requests = Read-only, then run:  gh aw secrets set COPILOT_GITHUB_TOKEN"
+echo "Done. If ANTHROPIC_API_KEY is listed as missing, create an API key at console.anthropic.com"
+echo "(Billing needs a few dollars of credit), then run:  gh aw secrets set ANTHROPIC_API_KEY"

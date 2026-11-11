@@ -1,7 +1,8 @@
 # Repository overlay for the agentic-workflows agent (FIS)
 
-The `agentic-workflows` Copilot agent (`.github/agents/agentic-workflows.md`) loads this file
-after its own guidance. Rules here win when they conflict with upstream defaults.
+The `agentic-workflows` skill (`.github/skills/agentic-workflows/SKILL.md`) and the optional Copilot
+agent (`.github/agents/agentic-workflows.md`) load this file after their own guidance. Rules here win
+when they conflict with upstream defaults.
 
 This repository is the **Financial Intelligence System (FIS)** course monorepo. Its agentic
 workflows are teaching material for Lab 7 (`docs/labs/lab07_github_agentic_workflows.md`).
@@ -13,8 +14,17 @@ Follow these conventions in every workflow you create or change:
 4. **Narrow shell for untrusted input:** any workflow that reads issue, PR or comment text gets a `bash:` allowlist of read-only commands (`cat`, `grep`, `find`, `head`, `ls`, `wc`), never `["*"]`.
 5. **Cost cap:** always set `timeout-minutes` and `max-ai-credits`. 100–200 is plenty for these workflows.
 6. **Deterministic first:** fetch or compute data in `steps:` and save it under `/tmp/gh-aw/`. Let the agent do only the judgment.
-7. **Always `noop`:** every prompt must say when to call `noop` instead of writing.
-8. **Compile pinned:** `gh aw compile` must finish with 0 errors and 0 warnings. Commit both the `.md` and the `.lock.yml`.
+   For pull-request workflows this is required, not optional: inside the sandbox the `gh` proxy returns no
+   diff and `null` for `files` and `mergedAt`. Copy the "Save the pull request's facts" step from
+   `fis-pr-summary.md` / `fis-code-review.md` and have the prompt `cat` the saved files, one simple command
+   at a time (pipes and `;` chains are denied by the shell allowlist).
+7. **Engine:** `engine: { id: claude, model: claude-haiku-5-5 }` with the `ANTHROPIC_API_KEY` secret, the
+   cheapest current Claude model. Move a single workflow to `claude-sonnet-5-5` only if Haiku measurably
+   misjudges it.
+8. **Always `noop`:** every prompt must say when to call `noop` instead of writing.
+9. **Compile pinned:** `gh aw compile` must finish with 0 errors and 0 warnings. Commit both the `.md` and the `.lock.yml`.
+10. **Instructions load from `main`:** on pull requests the run restores `.github/` from the base branch, so a
+    prompt or rulebook change only takes effect after it is merged.
 
 Repository facts the agent can rely on:
 

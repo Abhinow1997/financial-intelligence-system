@@ -38,9 +38,8 @@ steps:
         | awk '/^diff --git /{skip = ($0 ~ /\.lock\.yml/)} !skip' > /tmp/gh-aw/pr/pr.diff
       wc -l /tmp/gh-aw/pr/pr.diff
 safe-outputs:
-  # Lab 7 §3: start in preview mode. The run summary shows the comment it WOULD post,
-  # and nothing is written. Delete this line, recompile, and open a new PR to go live.
-  staged: true
+  # Live: the comment is posted on the PR. To preview instead (shown only in the run
+  # summary, nothing written), add `staged: true` here and recompile (Lab 7 §3.3).
   add-comment:
     max: 1
 ---
