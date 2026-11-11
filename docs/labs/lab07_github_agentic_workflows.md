@@ -193,14 +193,25 @@ unrestricted internet access; expected explicit domains or ecosystem identifiers
 Undo it again and recompile. You cannot give the agent write access or open internet by accident.
 The only way to write is through `safe-outputs:`.
 
-Rule: **edit the `.md`, never the `.lock.yml`.** The prompt body is read from the `.md` at run
-time, so a body-only edit takes effect on the next run. A **frontmatter** edit needs `gh aw
-compile`, because the lock file stores a hash of the frontmatter and the run fails fast if they
-differ. `gh aw compile --watch` recompiles on every save.
+Rule: **edit the `.md`, never the `.lock.yml`.** A **frontmatter** edit needs `gh aw compile`,
+because the lock file stores a hash of the frontmatter and the run fails fast if they differ.
+`gh aw compile --watch` recompiles on every save.
+
+**Where each part comes from on a pull request.** The two halves of a helper are loaded from
+different places, and that is a deliberate safety feature:
+
+| Part | Loaded from | So an edit takes effect… |
+|---|---|---|
+| Frontmatter (trigger, permissions, `steps:`, `safe-outputs`, `staged`) | the compiled `.lock.yml` **on the PR's branch** | in that same PR, after you recompile and push |
+| Prompt body, and everything else under `.github/` (including the rulebook) | **`main`**: the run restores `.github/` from the base branch before the AI starts | only after it is merged into `main` |
+
+So a pull request **cannot rewrite the instructions or the rules of its own review**. Look for the
+step "Restore agent config folders from base branch" in any lock file. To change what a helper
+*says* or *checks*, merge that change first, then test it on a new PR.
 
 ### 3.3 Run it: preview first, then live
 
-Pull-request workflows run from the **PR's own branch**, so you can try this one before merging anything:
+The explainer is already on `main`, so any new pull request triggers it. Make a small test PR:
 
 ```bash
 git switch main
@@ -493,6 +504,9 @@ access. Argue in your PR whether the extra credential is worth it.
 - **The task closed the moment you merged, before the reviewer ran** → the PR said `Closes #N`, so GitHub
   closed it. Use `Task: #N`.
 - **The lock file is out of date** → you edited the frontmatter and did not recompile. Run `gh aw compile`, then commit both files.
+- **You changed a helper's instructions or the rulebook in your PR, but the bot ignored it** → that is by
+  design. On a pull request, everything under `.github/` is loaded from `main` (§3.2). Merge the change
+  first, then open a new PR to test it.
 - **The run succeeded but nothing happened** → look in the run summary for `noop` and its reason, or for
   `staged` mode. `gh aw audit <run-id>` shows rejected safe outputs.
 
