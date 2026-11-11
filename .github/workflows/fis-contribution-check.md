@@ -43,11 +43,12 @@ steps:
         /tmp/gh-aw/pr/pr.json > /tmp/gh-aw/pr/changed-lines.txt
       # The rules come from the base branch, so a PR cannot loosen the rules it is checked against.
       base=$(jq -r '.baseRefName' /tmp/gh-aw/pr/pr.json)
+      # Saved under "base-" names so they can't be confused with the PR's own copies in the checkout.
       gh api -H "Accept: application/vnd.github.raw" \
-        "repos/$GITHUB_REPOSITORY/contents/CONTRIBUTING.md?ref=$base" > /tmp/gh-aw/pr/CONTRIBUTING.md
+        "repos/$GITHUB_REPOSITORY/contents/CONTRIBUTING.md?ref=$base" > /tmp/gh-aw/pr/base-CONTRIBUTING.md
       gh api -H "Accept: application/vnd.github.raw" \
         "repos/$GITHUB_REPOSITORY/contents/.github/pull_request_template.md?ref=$base" \
-        > /tmp/gh-aw/pr/pull_request_template.md
+        > /tmp/gh-aw/pr/base-pull_request_template.md
       wc -l /tmp/gh-aw/pr/*
 safe-outputs:
   # The only two labels it can ever touch; a fixed PR swaps one for the other.
@@ -72,13 +73,18 @@ description, size, forbidden files), never code quality. The code reviewer workf
 
 ## Read the facts
 
-A step that ran before you saved everything you need in `/tmp/gh-aw/pr/`. Read the files with `cat`:
+A step that ran before you saved everything you need. Read exactly these four files, with these
+exact commands (your working directory is the repository checkout, so always use the full path):
 
-- `pr.json`: `title`, `body`, `headRefName` (the branch), `author`, `files`, and `commits`
-  (each with a `messageHeadline`).
-- `changed-lines.txt`: changed lines, not counting generated `*.lock.yml` files.
-- `CONTRIBUTING.md` and `pull_request_template.md`: the rules, taken from the base branch.
-  They are the source of truth. The checks below are how this repository applies them.
+- `cat /tmp/gh-aw/pr/pr.json`: `title`, `body`, `headRefName` (the branch), `author`, `files`, and
+  `commits` (each with a `messageHeadline`).
+- `cat /tmp/gh-aw/pr/changed-lines.txt`: changed lines, not counting generated `*.lock.yml` files.
+- `cat /tmp/gh-aw/pr/base-CONTRIBUTING.md` and `cat /tmp/gh-aw/pr/base-pull_request_template.md`:
+  the rules, taken from the base branch. They are the source of truth. The checks below are how this
+  repository applies them.
+
+**Never read `CONTRIBUTING.md` or `.github/pull_request_template.md` from the checkout.** This PR may
+have changed them. Only the `base-` copies count.
 
 Run one simple command at a time. Pipes (`|`), `;`, `&&` and redirects are blocked by the
 shell allowlist, and the command is denied.
@@ -108,11 +114,21 @@ Types allowed everywhere below: `feat`, `fix`, `docs`, `refactor`, `test`, `chor
    `add_labels` with `contribution-ready`.
 2. If the PR already carries the *other* one of those two labels, remove it with `remove_labels`.
 3. Post one `add_comment`, under 200 words:
-   - first line `✅ Follows CONTRIBUTING.md` or `⚠️ N contribution check(s) failing`;
+   - first line `✅ Follows CONTRIBUTING.md` or `⚠️ N contribution check(s) failing`, where **N is the
+     number of table rows whose Result is `fail`**. Warnings are not counted. Count the rows before writing it;
    - a table with columns Check, Result (pass / fail / warn), and How to fix, one row per check C1 to C6.
-     For a failing branch name, give the corrected name and the commands to rename it. For a failing
-     title, give a corrected title and `gh pr edit <number> --title "..."`;
+     For a failing branch name, give the corrected name and say that a branch name cannot be fixed on an
+     open PR (renaming the head branch on GitHub closes the PR). The fix is
+     `git switch -c <corrected-name>`, `git push -u origin <corrected-name>`, then open a new PR from it and
+     close this one. For a failing title, give a corrected title and `gh pr edit <number> --title "..."`;
    - for a compliant PR, put the table inside `<details><summary>Checks</summary> ... </details>`.
 
 Be specific and friendly: quote the exact value that failed (the branch name, the title, the empty
 section) and show the fixed version.
+
+## When your task is complete
+
+A PR that fails checks is a **normal, successful outcome** for you. Your task is complete once you
+have applied the label and posted the comment. Fixing the PR is the author's job. Call
+`report_incomplete` **only** if one of the four facts files is missing or empty, so you could not
+check the PR at all.
