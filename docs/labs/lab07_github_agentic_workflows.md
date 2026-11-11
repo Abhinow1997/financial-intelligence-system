@@ -192,7 +192,7 @@ steps:                    # a plain script that runs BEFORE the AI, outside its 
   - name: Save the pull request's facts for the agent
     run: |                #   (abridged) writes these files to /tmp/gh-aw/pr/
       gh pr view "$PR_NUMBER" --json title,body,headRefName,files,commits,... > pr.json
-      gh api ".../contents/CONTRIBUTING.md?ref=$base" > CONTRIBUTING.md   # the rules, from main
+      gh api ".../contents/CONTRIBUTING.md?ref=$base" > base-CONTRIBUTING.md   # the rules, from main
 safe-outputs:             # the ONLY writes this workflow can ever make
   add-labels:
     allowed: [contribution-ready, needs-contribution-fixes]
@@ -274,7 +274,8 @@ fetches `CONTRIBUTING.md` from `main`: it lives outside `.github/`, so nothing e
 
 ### 3.3 Run it: break the rules, fix them, then try preview mode
 
-Open a pull request that breaks three rules on purpose. `lab7` is not an allowed branch type (C1):
+**Round 1: a mistake you cannot fix in place.** Open a pull request that breaks three rules on
+purpose. `lab7` is not an allowed branch type (C1):
 
 ```bash
 git switch main
@@ -291,30 +292,34 @@ git push -u origin lab7/checker-test
 gh pr create --title "update readme" --body "quick fix"
 ```
 
-Within 3–5 minutes the PR gets `needs-contribution-fixes` and one comment: `⚠️ 3 contribution
-check(s) failing`, with a table showing the corrected branch name, title and template. (The code
-reviewer does not run: this PR touches nothing under `services/`.)
+Within 3–5 minutes the PR gets `needs-contribution-fixes` and one comment, `⚠️ 3 contribution
+check(s) failing` (C1, C2, C4; C3 is only a warning), with a table saying how to fix each one. (The
+code reviewer does not run: this PR touches nothing under `services/`.)
 
-**Fix it the way the comment says.** Each fix is an `edited` or `synchronize` event, so the checker
-runs again and the previous comment is collapsed:
-
-1. **Title (C2):** `gh pr edit --title "docs(readme): fix typo in quick start"`
-2. **Template (C4):** on GitHub, edit the PR description: paste [`.github/pull_request_template.md`](../../.github/pull_request_template.md)
-   and fill in What & why, How I verified, and the AI Engineering Log.
-3. **Branch (C1):** on GitHub, **Code → Branches → ✏️** next to `lab7/checker-test`, and rename it to
-   `docs/checker-test`. The open PR follows the rename. Then point your local branch at it and push
-   one more commit to re-run the check:
+A **branch name cannot be fixed on an open PR**. Renaming the head branch on GitHub does not move the
+PR to the new name: it **closes** it. So the fix for C1 is a correctly named branch and a new PR.
+Note the old PR's number, then:
 
 ```bash
-git fetch -p
-git branch -m docs/checker-test
-git branch -u origin/docs/checker-test
-git commit --allow-empty -m "docs(readme): re-run contribution checks"
-git push
+git switch -c docs/checker-test
+git push -u origin docs/checker-test
+gh pr close <old-number> --comment "Wrong branch name; continuing from docs/checker-test"
+gh pr create --title "update readme" --body "quick fix"
 ```
 
-The label flips to `contribution-ready`, and the last comment reads `✅ Follows CONTRIBUTING.md`.
-C3 may still show a warning for the first commit, `update readme`. Warnings don't block the label.
+The new PR passes C1 and still fails C2 and C4: `⚠️ 2 contribution check(s) failing`.
+
+**Round 2: fix it in place.** Title and description *can* be fixed on the open PR. Each fix is an
+`edited` event, so the checker runs again, and the previous comment is collapsed:
+
+1. **Title (C2):** `gh pr edit --title "docs(readme): fix typo in quick start"`. The next comment says
+   `⚠️ 1 contribution check(s) failing` (C4).
+2. **Template (C4):** on GitHub, edit the PR description: paste [`.github/pull_request_template.md`](../../.github/pull_request_template.md)
+   and fill in What & why, How I verified, and the AI Engineering Log.
+
+The label **swaps** from `needs-contribution-fixes` to `contribution-ready` (the checker removes the
+old one), and the last comment reads `✅ Follows CONTRIBUTING.md`, with the checks folded under
+*Checks*. C3 still shows a warning for the commit `update readme`. Warnings don't block the label.
 
 **Now try preview mode**, the safe way to test a change to a helper on a real repository without
 spamming it. On the same branch, add one line to `fis-contribution-check.md`:
@@ -603,6 +608,8 @@ access. Argue in your PR whether the extra credential is worth it.
   comment says which rule failed.
 - **The task closed the moment you merged, before the reviewer ran** → the PR said `Closes #N`, so GitHub
   closed it. Use `Task: #N`.
+- **You renamed your PR's branch on GitHub and the PR closed** → that is GitHub's behaviour: renaming a
+  PR's head branch closes the PR. Push a correctly named branch, open a new PR from it, and close the old one (§3.3).
 - **The lock file is out of date** → you edited the frontmatter and did not recompile. Run `gh aw compile`, then commit both files.
 - **You changed a helper's instructions or the rulebook in your PR, but the bot ignored it** → that is by
   design. On a pull request, everything under `.github/` is loaded from `main` (§3.2). Merge the change
