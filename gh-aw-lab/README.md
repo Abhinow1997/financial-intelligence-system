@@ -112,6 +112,10 @@ Rule of thumb from the gh-aw docs: **deterministic where you can, agentic where 
    - Store it as a repo secret: `gh aw secrets set ANTHROPIC_API_KEY`. Paste the key when prompted;
      it never touches a file. Every fork needs its own secret, because forks do not inherit secrets.
 4. Check the setup: `gh aw secrets bootstrap --non-interactive` lists any secret that is still missing.
+   Then, under **Settings → Actions → General → Workflow permissions**, tick **Allow GitHub Actions to create
+   and approve pull requests** (or run `gh api -X PUT repos/<owner>/<repo>/actions/permissions/workflow
+   -f default_workflow_permissions=read -F can_approve_pull_request_reviews=true`). The repo assistant needs it
+   to open draft PRs. Without it, gh-aw falls back to an issue with a "Create the pull request" link.
 5. Set up the repository for gh-aw, from the repo root: `gh aw init --engine claude`. It marks lock
    files as generated in `.gitattributes` and adds the `agentic-workflows` skill (`.github/skills/`),
    which follows the house rules in `.github/aw/instructions.md`. (This repo also has
