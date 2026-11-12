@@ -290,6 +290,10 @@ def get_fundamentals(ticker: TickerParam) -> Fundamentals:
         latency_ms=_elapsed_ms(started),
     )
 
+@router.get("/symbol/{ticker}")
+def get_symbol(ticker: str):
+    return {"ticker": ticker.upper()}
+
 
 @router.post("/compare", response_model=CompareResponse, summary="Rank symbols by return")
 def compare(req: CompareRequest) -> CompareResponse:

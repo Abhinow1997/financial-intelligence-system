@@ -1,0 +1,7 @@
+# Extra Python packages your DAGs import, installed into the image at build time.
+# Airflow itself and its providers already ship in the base image; don't list them here.
+# Rebuild after editing: docker compose up --build
+#
+# Examples:
+# pandas>=2.2
+# yfinance>=1.7.0
