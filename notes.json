@@ -2,13 +2,15 @@
   "version": 1,
   "tasks": {
     "26": {
-      "status": "pr_open",
+      "status": "pr_requested",
       "pr": null,
-      "note": "market dividends endpoint; draft PR on feat/r3-task-26-dividends"
+      "note": "market dividends endpoint; branch feat/r3-task-26-dividends-2 (feat/r3-task-26-dividends already existed on origin). Draft PR requested this run; confirm against prs.json next run."
     }
   },
   "activity_issue": null,
   "notes": [
-    "pytest with both 'tests' and 'services/backend/tests' in one call fails at collection (duplicate 'tests' package); run them separately"
+    "pytest with both 'tests' and 'services/backend/tests' in one call fails at collection (duplicate 'tests' package); run them separately",
+    "A task marked pr_open/pr_requested with no matching entry in prs.json was never opened; treat as not started",
+    "Before choosing a branch name, check git branch -r --list origin/<name>; append -2 if taken"
   ]
 }
