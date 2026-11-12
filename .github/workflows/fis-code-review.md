@@ -7,7 +7,9 @@ engine:
   model: claude-haiku-5-5
 on:
   pull_request:
-    types: [opened, synchronize, reopened, closed]
+    # ready_for_review: the repo assistant's draft PRs are opened by a workflow, which starts no other
+    # workflows, so the review starts when a human marks the draft "Ready for review".
+    types: [opened, synchronize, reopened, ready_for_review, closed]
     paths:
       - "services/frontend/**"
       - "services/backend/**"

@@ -33,3 +33,8 @@ Repository facts the agent can rely on:
   that file instead of hard-coding rules in their prompt. Never edit the rulebook from a workflow.
 - A task is an issue labelled `task`. A PR links to it with `Task: #N` (not `Closes #N`). Only
   `fis-code-review` closes tasks, and only through `close-issue` with `required-labels: [task]`.
+- Workflows that write code (`fis-repo-assist`) open **draft** PRs only, through `create-pull-request` with
+  `allowed-files`, `allowed-branches`, `protected-files: blocked` and `auto-close-issue: false`. Their agent
+  has no network: install tools in a `steps:` script, into `/tmp/gh-aw/venv`.
+- PRs opened by a workflow start no other workflows. CI and `fis-code-review` also listen for
+  `ready_for_review`, so a human marking such a draft ready starts them.

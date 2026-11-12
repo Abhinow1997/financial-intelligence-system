@@ -3,6 +3,9 @@ name: CI
 on:
   pull_request:
     branches: ["main"]
+    # The defaults plus ready_for_review: PRs opened by a workflow (the Lab 7 repo assistant) trigger
+    # no workflows, so CI starts when a human marks such a draft "Ready for review".
+    types: [opened, synchronize, reopened, ready_for_review]
   push:
     branches: ["main"]
 

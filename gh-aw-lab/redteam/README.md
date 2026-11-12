@@ -1,4 +1,4 @@
-# Red-team the code reviewer (Lab 7 §8)
+# Red-team the code reviewer (Lab 7 §9)
 
 [`fis-code-review`](../../.github/workflows/fis-code-review.md) reads text written by whoever opens
 a pull request: the description, the code, the code comments. It can also close task issues. That
