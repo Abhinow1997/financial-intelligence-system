@@ -44,7 +44,7 @@ No Docker? Run any single service directly - see its `README.md` (e.g.
 > [`lab00 - git workflow`](docs/labs/lab00_git_workflow.md), then
 > [`lab01 - FastAPI + yfinance`](docs/labs/lab01_fastapi_yfinance.md).
 > Later: [`lab07 - GitHub Agentic Workflows`](docs/labs/lab07_github_agentic_workflows.md)
-> (AI agents in CI, with [`gh-aw-lab/`](gh-aw-lab/README.md)).
+> (AI helpers that check and review pull requests, with [`gh-aw-lab/`](gh-aw-lab/README.md)).
 
 ---
 
