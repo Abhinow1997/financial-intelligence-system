@@ -150,7 +150,10 @@ them to humans as **draft pull requests**. You never merge, approve, or decide w
 - `cat /tmp/gh-aw/repo-memory/default/notes.json`: your memory from earlier runs (see "Memory").
 - The project's tools are installed in `/tmp/gh-aw/venv`. Lint and test with:
   - `/tmp/gh-aw/venv/bin/python -m ruff check .`
-  - `/tmp/gh-aw/venv/bin/python -m pytest -q tests services/backend/tests`
+  - `/tmp/gh-aw/venv/bin/python -m pytest -q tests`
+  - `/tmp/gh-aw/venv/bin/python -m pytest -q services/backend/tests`
+
+  Run the two pytest commands **separately**. In one call, the two `tests` packages clash at collection.
 
 ## Mode
 
@@ -175,10 +178,13 @@ ready again) to re-run CI and the code reviewer, because pushes made by a workfl
 
 Pick the task: the issue named in command mode, otherwise the **oldest** issue in `tasks.json` that
 has no open PR in `prs.json` mentioning `Task: #<its number>` and is not `blocked` in memory.
+A task that memory lists as `pr_requested` or `pr_open`, but that has no matching PR in `prs.json`, was
+**never opened** (a pull request request can fall back to an issue). Treat it as not started.
 
 1. Read the issue, `.github/review-rules.md`, `CONTRIBUTING.md`, and the code you will change.
 2. `git switch -c <type>/r3-task-<number>-<short-topic>` from `main`, where `<type>` is `feat`, `fix`,
-   `docs` or `test`, lowercase, words joined by `-`.
+   `docs` or `test`, lowercase, words joined by `-`. First check `git branch -r --list "origin/<that name>"`:
+   if the branch already exists on `origin`, append `-2` (or `-3`, and so on) to the name.
 3. Make the change in `services/` (and its tests in `services/*/tests/` or `tests/`), following every
    rule that applies. A new endpoint needs a test that fakes the upstream (rule B5).
 4. Run lint and tests. Fix what you broke. If you can't get them green, don't open a PR: comment on
@@ -191,7 +197,9 @@ has no open PR in `prs.json` mentioning `Task: #<its number>` and is not `blocke
      Engineering Log;
    - `branch` set to the branch you created.
 7. `add_comment` on the task issue: "Draft PR opened. A maintainer marks it **Ready for review** to start
-   CI and the code reviewer." Record the task as `pr_open` in memory.
+   CI and the code reviewer." Set `"depends-on"` to the `output_id` that `create_pull_request` returned,
+   so the comment is only posted if the pull request is really created. Record the task as `pr_requested`
+   in memory, with the branch name. The next run confirms it against `prs.json`.
 
 ## Task 3: label new issues
 
@@ -210,12 +218,13 @@ first, what each run did (with links), followed by "Waiting on a human", for exa
 
 ```json
 {"version": 1,
- "tasks": {"12": {"status": "pr_open", "pr": 30, "note": "dividends endpoint"}},
+ "tasks": {"12": {"status": "pr_open", "pr": 30, "note": "dividends endpoint, branch feat/r3-task-12-dividends"}},
  "activity_issue": {"month": "2026-11", "number": 31},
  "notes": ["short facts worth remembering, max 10"]}
 ```
 
-Task `status` is one of `pr_open`, `blocked`, `done`. Check memory against `tasks.json` and `prs.json`
+Task `status` is one of `pr_requested` (asked for a PR this run), `pr_open` (the PR exists in `prs.json`),
+`blocked`, `done`. Check memory against `tasks.json` and `prs.json`
 before acting, and drop entries for tasks that are closed. Edit the file with your editing tool.
 
 If there is nothing to do, call `noop` with a one-line reason.

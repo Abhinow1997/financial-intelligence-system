@@ -72,6 +72,10 @@ Work in **your fork**. Forks start with Actions and Issues switched off:
 
 1. On GitHub, open your fork. On the **Actions** tab, click *I understand my workflows, go ahead and enable them*.
 2. Under **Settings → General → Features**, tick **Issues**.
+3. Under **Settings → Actions → General → Workflow permissions**, tick **Allow GitHub Actions to create and
+   approve pull requests**, then **Save**. The repo assistant (§7) opens draft PRs. Without this, gh-aw
+   pushes its branch and opens an issue with a "Create the pull request" link instead. None of our helpers
+   ever *approves* a PR.
 
 Install the CLI and the extension:
 
@@ -593,7 +597,13 @@ gh issue create --title "Add GET /market/dividends/{ticker}" --label task --body
 gh issue comment <T> --body "/repo-assist implement #<T>"
 ```
 
-The `/repo-assist` comment must start with `/repo-assist`, and you need write access to the repo. Watch it work:
+The `/repo-assist` comment must start with `/repo-assist`, and you need write access to the repo.
+
+> **Git Bash on Windows rewrites arguments that start with `/`.** It turns `"/repo-assist ..."` into
+> `"C:/Program Files/Git/repo-assist ..."`, so the comment never matches. In Git Bash, run the command as
+> `MSYS_NO_PATHCONV=1 gh issue comment ...`, or use PowerShell, or comment on the issue in the browser.
+
+Watch it work:
 
 ```bash
 gh run list --workflow fis-repo-assist.lock.yml --limit 3
@@ -731,6 +741,11 @@ access. Argue in your PR whether the extra credential is worth it.
   starts no other workflows. Mark it **Ready for review** (`gh pr ready <PR>`) to start CI and the code reviewer (§7.3).
 - **The assistant pushed a fix, but CI and the reviewer didn't re-run** → same reason. Close and reopen the PR,
   or mark it draft and then ready again.
+- **The assistant opened an issue titled like a pull request instead of a PR** → *Allow GitHub Actions to create
+  and approve pull requests* is off (§2). gh-aw pushed the branch and put a "Create the pull request" link in that
+  issue. Turn the setting on, then close that issue and delete the branch before asking the assistant again.
+- **Your `/repo-assist` comment shows as `C:/Program Files/Git/repo-assist ...`** → Git Bash rewrote it (§7.4).
+  Edit the comment in the browser, or post it with `MSYS_NO_PATHCONV=1 gh issue comment ...`.
 - **`/repo-assist` did nothing** → the comment must *start* with `/repo-assist`, it must be on an issue or an issue
   comment (not a code-review comment), and you need write access. Check the Actions tab for a skipped run.
 - **The assistant's PR was rejected for its files or branch** → it tried to change something outside `services/**`
@@ -782,6 +797,7 @@ gh aw add githubnext/agentics/<name>    # install a sample workflow
 gh aw secrets set ANTHROPIC_API_KEY     # store the engine key
 gh aw models                            # model IDs and their per-token prices
 gh issue comment <T> --body "/repo-assist implement #<T>"   # ask the assistant for a draft PR
+                                        #   (Git Bash: prefix MSYS_NO_PATHCONV=1, see §7.4)
 gh pr ready <PR>                        # a human starts CI and the reviewer on a bot's draft
 ```
 
