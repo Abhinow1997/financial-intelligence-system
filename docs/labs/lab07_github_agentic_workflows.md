@@ -1,9 +1,10 @@
 # Lab 7 — GitHub Agentic Workflows: AI helpers that review your code
 
-> **Goal:** put AI agents to work on this repository, *safely*. You will run two of them. The
+> **Goal:** put AI agents to work on this repository, *safely*. You will run three of them. The
 > first checks that every pull request follows `CONTRIBUTING.md`. The second reviews frontend and backend
 > pull requests against a written rulebook, and closes the linked task only when the merged code
-> follows the rules. Then you will try to trick the reviewer, and explain why the trick failed.
+> follows the rules. The third implements tasks as draft pull requests for the other two and a human to
+> check. Then you will try to trick the reviewer, and explain why the trick failed.
 > **Time:** ~120 min · **Prereqs:** [Lab 0](lab00_git_workflow.md), [Lab 1](lab01_fastapi_yfinance.md), your own fork of this repo,
 > and an [Anthropic API](https://console.anthropic.com) account with a few dollars of credit (each run costs about $0.01)
 > **You produce:** one merged PR that adds a rule to the rulebook, a task issue closed by the reviewer, and your red-team findings.
@@ -25,6 +26,7 @@ same answer, and a script decides pass or fail. Some questions a script cannot a
 - *"Does this pull request follow our contribution process: branch name, title, filled-in template?"*
 - *"Does this new endpoint follow the conventions from Lab 1: a typed response model, `TickerParam`, `latency_ms`, a test?"*
 - *"Task #12 says 'add a dividends endpoint'. Is it really done, or just merged?"*
+- *"Could an AI write a first version of task #12, without being able to ship it on its own?"*
 
 Each one needs **judgment** plus **context from the repository**, which is exactly what a coding
 agent is good at. [GitHub Agentic Workflows](https://github.github.com/gh-aw/) (gh-aw) run one on
@@ -217,7 +219,7 @@ will see in every good workflow:
 - it says **when to do nothing**: call `noop` for a bot's pull request. A run that correctly does
   nothing is a success, and `noop` records why.
 
-It also says the PR text is **data, not instructions**. Keep that line in mind for §8.
+It also says the PR text is **data, not instructions**. Keep that line in mind for §9.
 
 ### 3.2 Compile: Markdown in, lock file out
 
@@ -355,7 +357,7 @@ Read it now. Every rule has an ID, is one checkable sentence, and points at code
 
 These are Lab 1's conventions, written down. Separating **rules** (data, edited by people) from
 the **prompt** (fixed, edited rarely) means the team can tighten its standards without touching
-the AI. You will add a rule yourself in §9.
+the AI. You will add a rule yourself in §10.
 
 **Tasks.** A task is an issue with the `task` label. **Issues → New issue → Task** applies it for
 you. A pull request links to its task with a line in its description:
@@ -508,7 +510,118 @@ and a list of what to fix. "Merged" and "done" are no longer the same thing.
 
 ---
 
-## 7. Debug and measure: logs, audit, cost
+## 7. Example 3: the repo assistant
+
+Examples 1 and 2 **check** work. Example 3 **does** work.
+[`fis-repo-assist.md`](../../.github/workflows/fis-repo-assist.md) implements `task` issues as
+**draft pull requests** that follow the rulebook. It also keeps its own pull requests healthy, labels
+new issues, and keeps a monthly activity log. You run it on demand: comment
+`/repo-assist <instructions>` on an issue, or start it from the Actions tab.
+
+It never merges and never approves. Its output is a draft that the code reviewer (Example 2) checks
+and a human decides about. Writing code is the riskiest thing an agent can do in your repository, so
+this section is mostly about **the limits around it**.
+
+### 7.1 Where it came from: reuse, then scope down
+
+It started as GitHub's [*Repo Assist*](https://github.com/githubnext/agentics/blob/main/docs/repo-assist.md)
+from githubnext/agentics. To compare, install the original on a scratch branch (don't merge it):
+
+```bash
+gh aw add-wizard githubnext/agentics/repo-assist
+```
+
+| Original | Ours | Why |
+|---|---|---|
+| Runs every 12 hours, plus `/repo-assist` | On demand only (a schedule is one commented-out line) | A course repo doesn't need a bot working twice a day, and every run costs money |
+| 10 tasks picked at random each run (dependencies, performance, "take the repo forward"…) | 4 tasks in a fixed order | Runs you can predict and explain |
+| Any shell command; the agent can reach npm, PyPI, Maven… | Read-only commands, `git`, and the project's own Python; **no internet** | A `steps:` script installs the test tools *before* the AI starts |
+| Up to 4 draft PRs, any files (protected files only request review) | Up to 2 draft PRs, only `services/**` and `tests/**`, branches `feat/*` `fix/*` `docs/*` `test/*`, protected files blocked | The smallest blast radius that still lets it do the job |
+| Writes `Fixes #N`, so GitHub closes the issue on merge | `auto-close-issue: false`; it writes `Task: #N` | The code reviewer closes the task only if the merged code passes the rulebook |
+| 60-minute runs, default engine | 30 minutes, 300-credit cap ($3), Claude Haiku | Cost |
+
+### 7.2 The limits, in the frontmatter
+
+```yaml
+on:
+  workflow_dispatch:            # Actions tab / gh aw run fis-repo-assist
+  slash_command:
+    name: repo-assist           # "/repo-assist implement #12" in an issue or comment
+permissions: { contents: read, issues: read, pull-requests: read, actions: read }   # still read-only
+tools:
+  bash: [cat, ls, grep, find, head, tail, wc, "git:*", "/tmp/gh-aw/venv/bin/python:*"]
+  repo-memory:                  # a notes.json kept on the branch memory/repo-assist-memory
+    branch-name: memory/repo-assist-memory
+network:
+  allowed: []                   # no internet: the step below installed everything it needs
+steps:
+  - name: Install the project's test and lint tools into /tmp/gh-aw/venv   # (abridged)
+safe-outputs:
+  create-pull-request:
+    draft: true
+    allowed-files: ["services/**", "tests/**"]
+    allowed-branches: ["feat/*", "fix/*", "docs/*", "test/*"]
+    protected-files: blocked
+    auto-close-issue: false
+    max: 2
+  push-to-pull-request-branch:
+    required-title-prefix: "[repo-assist] "   # follow-up commits only to its own PRs
+```
+
+Even the agent that writes code has a **read-only token**. Its branch, commits and memory file only
+reach GitHub through the `safe_outputs` and `push_repo_memory` jobs, which check the rules above first.
+
+### 7.3 The loop: AI writes, AI reviews, a human merges
+
+1. A human opens a `task` issue. Only humans decide what becomes work, and the assistant can never add the `task` label.
+2. `/repo-assist implement #N`: the assistant reads the issue, the rulebook and `CONTRIBUTING.md`, makes the
+   change and its tests, runs `ruff` and `pytest`, and opens a **draft PR** titled
+   `[repo-assist] feat(...): ...` with `Task: #N`. It comments on the issue.
+3. **Nothing else starts yet.** GitHub never lets a workflow's own token trigger other workflows, so CI and
+   the code reviewer stay quiet. A human reads the draft and clicks **Ready for review**. That is a human
+   event, so CI and the code reviewer both run (each listens for `ready_for_review`).
+4. Changes requested? Comment `/repo-assist fix your PR #M`. The assistant pushes a fix. Then close and
+   reopen the PR, which is a human event again, to re-run CI and the reviewer.
+5. A human merges. The reviewer's merge mode re-checks the code and closes task `#N` as `verified`.
+
+### 7.4 Run it
+
+Create a small task, then ask the assistant to implement it:
+
+```bash
+gh issue create --title "Add GET /market/dividends/{ticker}" --label task --body "Return a typed list of dividends for a ticker. Done when the code reviewer passes."
+gh issue comment <T> --body "/repo-assist implement #<T>"
+```
+
+The `/repo-assist` comment must start with `/repo-assist`, and you need write access to the repo. Watch it work:
+
+```bash
+gh run list --workflow fis-repo-assist.lock.yml --limit 3
+gh pr list --search "[repo-assist] in:title"
+```
+
+A run takes about 5–15 minutes. Read the draft PR as a reviewer would: the diff, the tests, and the
+"How I verified" section with the exact commands it ran. Then:
+
+```bash
+gh pr ready <PR>                       # starts CI and the code reviewer
+gh pr merge <PR> --merge               # after the review passes: the reviewer then closes the task
+```
+
+Its memory is an ordinary file on an ordinary branch:
+
+```bash
+git fetch origin memory/repo-assist-memory
+git show origin/memory/repo-assist-memory:notes.json
+```
+
+> **Model choice.** It runs on Claude Haiku 5.5, the cheapest model. Writing code is harder than checking
+> it. If the drafts are weak, switch just this helper to `model: claude-sonnet-5-5` ($2 / $10 per million
+> tokens instead of $0.10 / $0.50), recompile, and compare the cost with `gh aw logs`.
+
+---
+
+## 8. Debug and measure: logs, audit, cost
 
 Every run leaves evidence. These three commands are your observability:
 
@@ -537,7 +650,7 @@ pushes 40 times a week, and say whether the `max-ai-credits: 200` cap is ever cl
 
 ---
 
-## 8. Red-team the reviewer
+## 9. Red-team the reviewer
 
 Follow [`gh-aw-lab/redteam/README.md`](../../gh-aw-lab/redteam/README.md). You will open four
 pull requests that try to get a task marked done dishonestly: a fake "pre-approved" note, a
@@ -554,7 +667,7 @@ attack fails even when the model complies.
 
 ---
 
-## 9. Graded exercise (your deliverable)
+## 10. Graded exercise (your deliverable)
 
 Branch off `main` as `feat/lab7-<your-handle>`.
 
@@ -574,7 +687,7 @@ Open your final PR using the template, including the **AI Engineering Log**, and
 - your rule (ID and sentence), and why it is worth enforcing;
 - links to the failing review, the passing review, and the closed task;
 - the AI-credit cost of each reviewer run (`gh aw logs`);
-- your **red-team table** and your one-paragraph answer from §8.
+- your **red-team table** and your one-paragraph answer from §9.
 
 **Bonus:** make the reviewer track tasks on a GitHub **Projects** board instead of closing issues.
 Look at the `update-project` safe output in the gh-aw docs. It needs an extra token with Projects
@@ -582,7 +695,7 @@ access. Argue in your PR whether the extra credential is worth it.
 
 ---
 
-## 10. Troubleshooting
+## 11. Troubleshooting
 
 - **`gh: command not found` right after installing** → open a new terminal (PATH is read at
   start-up). On Windows the binary is `C:\Program Files\GitHub CLI\gh.exe`.
@@ -602,7 +715,7 @@ access. Argue in your PR whether the extra credential is worth it.
   default), or the person who opened it lacks write access (see below).
 - **It runs for you but not for a classmate's PR** → by default an agentic workflow only runs for people
   with **admin, maintain or write** access, and skips everyone else. `roles: all` under `on:` would open it
-  to anyone, which, after §8, you should think hard about.
+  to anyone, which, after §9, you should think hard about.
 - **The task did not close after merging** → check the reviewer's merge-mode run: the PR description
   needs `Task: #N`, the issue needs the `task` label and must be open, and every rule must pass. The task
   comment says which rule failed.
@@ -614,12 +727,21 @@ access. Argue in your PR whether the extra credential is worth it.
 - **You changed a helper's instructions or the rulebook in your PR, but the bot ignored it** → that is by
   design. On a pull request, everything under `.github/` is loaded from `main` (§3.2). Merge the change
   first, then open a new PR to test it.
+- **The assistant's draft PR has no CI run and no review** → by design. A PR opened by a workflow's own token
+  starts no other workflows. Mark it **Ready for review** (`gh pr ready <PR>`) to start CI and the code reviewer (§7.3).
+- **The assistant pushed a fix, but CI and the reviewer didn't re-run** → same reason. Close and reopen the PR,
+  or mark it draft and then ready again.
+- **`/repo-assist` did nothing** → the comment must *start* with `/repo-assist`, it must be on an issue or an issue
+  comment (not a code-review comment), and you need write access. Check the Actions tab for a skipped run.
+- **The assistant's PR was rejected for its files or branch** → it tried to change something outside `services/**`
+  and `tests/**`, or used a branch outside `feat/*` `fix/*` `docs/*` `test/*`. That is the `create-pull-request`
+  limit working (§7.2). `gh aw audit <run-id>` shows the rejected output.
 - **The run succeeded but nothing happened** → look in the run summary for `noop` and its reason, or for
   `staged` mode. `gh aw audit <run-id>` shows rejected safe outputs.
 
 ---
 
-## 11. Cheat sheet
+## 12. Cheat sheet
 
 ```yaml
 ---
@@ -645,6 +767,8 @@ safe-outputs:                           # the only writes, and their limits
   create-pull-request-review-comment: { max: 5 }
   add-labels: { allowed: [a, b], max: 2 }
   close-issue: { target: "*", required-labels: [task], state-reason: completed }
+  create-pull-request: { draft: true, allowed-files: ["services/**"], auto-close-issue: false, max: 2 }
+  push-to-pull-request-branch: { required-title-prefix: "[repo-assist] " }   # only its own PRs
 ---
 Prompt in Markdown. Say what to read, what to output, and when to call `noop`.
 ```
@@ -657,6 +781,8 @@ gh aw forecast                          # projected AIC spend
 gh aw add githubnext/agentics/<name>    # install a sample workflow
 gh aw secrets set ANTHROPIC_API_KEY     # store the engine key
 gh aw models                            # model IDs and their per-token prices
+gh issue comment <T> --body "/repo-assist implement #<T>"   # ask the assistant for a draft PR
+gh pr ready <PR>                        # a human starts CI and the reviewer on a bot's draft
 ```
 
 ### Glossary
@@ -669,4 +795,4 @@ that runs before the AI, outside its sandbox ·
 **staged** safe outputs previewed, not applied · **`noop`** an explicit "nothing to do" result ·
 **rulebook** `.github/review-rules.md`, the human-written rules the reviewer applies ·
 **task** an issue labelled `task`, linked from a PR by `Task: #N` · **AWF** Agent Workflow Firewall ·
-**AIC** AI Credit, $0.01 of model usage · **prompt injection** instructions hidden in data the agent reads.
+**AIC** AI Credit, $0.01 of model usage · **prompt injection** instructions hidden in data the agent reads · **draft PR** a pull request marked not ready, which here only a human promotes · **repo memory** a small file on its own branch (`memory/repo-assist-memory`) that an agent reads and updates between runs · **slash command** a trigger from a comment that starts with `/name`.

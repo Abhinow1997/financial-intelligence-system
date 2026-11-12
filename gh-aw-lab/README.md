@@ -15,21 +15,23 @@ This folder holds the supporting material.
 | Path | What it is |
 |---|---|
 | [`scripts/setup-windows.ps1`](scripts/setup-windows.ps1), [`scripts/setup.sh`](scripts/setup.sh) | Install and verify `gh` and the `gh aw` extension |
-| [`redteam/`](redteam) | Four pull requests that try to trick the code reviewer (Lab 7 §8) |
-| [`starter/rule-template.md`](starter/rule-template.md) | How to write a good review rule, for the graded exercise (Lab 7 §9) |
+| [`redteam/`](redteam) | Four pull requests that try to trick the code reviewer (Lab 7 §9) |
+| [`starter/rule-template.md`](starter/rule-template.md) | How to write a good review rule, for the graded exercise (Lab 7 §10) |
 
-### The two lab examples
+### The three lab examples
 
-Both live where GitHub needs them, in [`.github/workflows/`](../.github/workflows):
+All three live where GitHub needs them, in [`.github/workflows/`](../.github/workflows):
 
 | Example | Trigger | Allowed writes | What it teaches |
 |---|---|---|---|
 | **1.** [`fis-contribution-check`](../.github/workflows/fis-contribution-check.md): contribution checker | Every PR opened, edited, pushed to, or reopened | 1 of 2 labels (`contribution-ready` / `needs-contribution-fixes`, each replacing the other), 1 checklist comment (older ones collapsed) | Anatomy, compile, lock files, staged mode, and **reusing a library workflow, then hardening it** (adapted from githubnext/agentics' *Contribution Guidelines Checker*) |
 | **2.** [`fis-code-review`](../.github/workflows/fis-code-review.md): code reviewer and task tracker | PR opened, pushed to, or closed, touching `services/frontend/` or `services/backend/` | 1 review (comment or request changes, **never approve**), up to 5 line comments, 4 status labels, 1 task comment, close 1 issue **only if labelled `task`** | Rules as data, PR reviews, linking work to tasks, tight write limits |
+| **3.** [`fis-repo-assist`](../.github/workflows/fis-repo-assist.md): repo assistant | On demand: `/repo-assist <instructions>` on an issue, or the Actions tab | Up to 2 **draft** PRs (only `services/**`, `tests/**`; `feat/* fix/* docs/* test/*` branches), pushes to its own PRs only, comments, labels from an allowlist, 1 monthly activity issue, a memory file on its own branch | An agent that *writes code* and the limits around it; **AI writes, AI reviews, a human merges** (adapted from githubnext/agentics' *Repo Assist*) |
 
 Example 1 checks the *process* against [`CONTRIBUTING.md`](../CONTRIBUTING.md) (branch name, PR title,
 commits, filled-in template, size, forbidden files), fetched from `main` so a PR can't loosen it.
 Example 2 checks the *code* against the human-written rulebook [`.github/review-rules.md`](../.github/review-rules.md).
+Example 3 *writes* code for `task` issues, following the same rulebook, as draft PRs that Example 2 reviews and a human merges.
 Tasks are issues created from the **Task** issue template ([`.github/ISSUE_TEMPLATE/task.md`](../.github/ISSUE_TEMPLATE/task.md)),
 which adds the `task` label. A PR links to one with `Task: #N` in its description (the PR template has the line).
 
@@ -41,6 +43,8 @@ flowchart LR
     PR -->|"merged"| M{"All rules pass?"}
     M -->|yes| C["Close #12 as completed<br/>label: verified"]
     M -->|no| F["Keep #12 open<br/>label: needs-follow-up"]
+    A["/repo-assist implement #12"] -->|"draft PR, Task: #12"| PR
+    H["Human: Ready for review"] -.->|"starts CI + review"| PR
 ```
 
 ---
@@ -113,8 +117,8 @@ Rule of thumb from the gh-aw docs: **deterministic where you can, agentic where 
    which follows the house rules in `.github/aw/instructions.md`. (This repo also has
    `.github/agents/agentic-workflows.md` from an earlier `--engine copilot` init: an optional Copilot
    Chat helper for writing workflows in VS Code.)
-6. Compile the two examples: `gh aw compile --strict`. This creates `fis-contribution-check.lock.yml` and
-   `fis-code-review.lock.yml`, the files GitHub actually runs. It must finish with 0 errors and 0 warnings.
+6. Compile the three examples: `gh aw compile --strict`. This creates `fis-contribution-check.lock.yml`,
+   `fis-code-review.lock.yml` and `fis-repo-assist.lock.yml`, the files GitHub actually runs. It must finish with 0 errors and 0 warnings.
 7. Commit everything `init` and `compile` produced together with the `.md` files, then merge. The
    helpers' instructions and the rulebook are always read from `main` (a pull request cannot rewrite its
    own reviewer), so they must be merged before any pull request can use them. Lock-file settings such as
@@ -127,11 +131,15 @@ Things to know for the shared course repository (students' own forks and team re
   from **someone else's fork** are blocked by default. Lab 0's flow (branches inside your fork or team
   repo) is unaffected. Opening it wider (`roles: all`, `forks: [...]` under `on:`) exposes the agent to
   anyone's prompt injection, and spends AI credits on every push.
-- **Cost.** Both helpers use Claude Haiku 5.5 (`claude-haiku-5-5`, $0.10 / $0.50 per million input /
+- **Cost.** All three helpers use Claude Haiku 5.5 (`claude-haiku-5-5`, $0.10 / $0.50 per million input /
   output tokens). Measured runs cost about 1 AI credit (≈ $0.01) each, billed to the Anthropic account
   behind `ANTHROPIC_API_KEY`. The reviewer runs on every push to a frontend/backend PR, capped at 200 AI
   credits ($2) per run; the contribution checker runs on every PR event (opened, edited, pushed, reopened),
-  capped at 80. Check real spend with `gh aw logs` and `gh aw forecast`.
+  capped at 80. The repo assistant runs only when asked, for up to 30 minutes, capped at 300 AI credits ($3) per run;
+  its runs are longer, so expect more than a cent each. Check real spend with `gh aw logs` and `gh aw forecast`.
+- **CI on the assistant's PRs.** PRs opened by a workflow trigger no other workflows, so `ci.yml` and the code
+  reviewer also listen for `ready_for_review`: a human marking the draft ready starts them. gh-aw can instead
+  push an extra commit with a `GH_AW_CI_TRIGGER_TOKEN` secret, but its docs advise against that on public repos.
 
 Switching engines or models is a frontmatter change: edit the `engine:` block (for example
 `model: claude-sonnet-5-5` for a more capable reviewer, or `id: copilot` with a `COPILOT_GITHUB_TOKEN`

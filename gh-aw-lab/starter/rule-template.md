@@ -36,5 +36,5 @@ Do not reuse an idea another student in your team already used.
 
 ## Then prove it works
 
-Follow §9 of the [Lab 7 handout](../../docs/labs/lab07_github_agentic_workflows.md): a task issue,
+Follow §10 of the [Lab 7 handout](../../docs/labs/lab07_github_agentic_workflows.md): a task issue,
 a PR that **breaks** your rule (the reviewer must flag your rule ID), a fix, a merge, and the task closing itself.
