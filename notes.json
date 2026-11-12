@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "tasks": {
+    "26": {
+      "status": "pr_open",
+      "pr": null,
+      "note": "market dividends endpoint; draft PR on feat/r3-task-26-dividends"
+    }
+  },
+  "activity_issue": null,
+  "notes": [
+    "pytest with both 'tests' and 'services/backend/tests' in one call fails at collection (duplicate 'tests' package); run them separately"
+  ]
+}
