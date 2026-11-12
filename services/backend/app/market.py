@@ -91,6 +91,18 @@ class Fundamentals(BaseModel):
     latency_ms: int
 
 
+class Dividend(BaseModel):
+    date: datetime  # ex-dividend date, as reported by Yahoo
+    amount: float
+
+
+class Dividends(BaseModel):
+    ticker: str
+    count: int
+    dividends: list[Dividend]
+    latency_ms: int
+
+
 class CompareRequest(BaseModel):
     tickers: list[str] = Field(min_length=2, max_length=5, examples=[["AAPL", "MSFT", "NVDA"]])
     period: Period = Period.SIX_MONTHS
@@ -244,6 +256,40 @@ def get_fundamentals(ticker: TickerParam) -> Fundamentals:
         week52_high=_optional(info, "fiftyTwoWeekHigh"),
         week52_low=_optional(info, "fiftyTwoWeekLow"),
         summary=_optional(info, "longBusinessSummary"),
+        latency_ms=_elapsed_ms(started),
+    )
+
+
+@router.get("/dividends/{ticker}", response_model=Dividends, summary="Dividend payment history")
+def get_dividends(ticker: TickerParam) -> Dividends:
+    """One entry per dividend payment, oldest first, from yfinance's `dividends` series."""
+    started = time.perf_counter()
+    symbol = ticker.upper()
+
+    try:
+        series = yf.Ticker(symbol).dividends
+    except YFRateLimitError:
+        raise _rate_limited() from None
+    except Exception:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Upstream (Yahoo Finance) returned an error for '{symbol}'. Try again later.",
+        ) from None
+
+    if series is None or series.empty:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No dividends found for '{symbol}'. The symbol may be unknown, or it pays no dividends.",
+        )
+
+    dividends = [
+        Dividend(date=when.to_pydatetime(), amount=float(amount))
+        for when, amount in series.sort_index().items()
+    ]
+    return Dividends(
+        ticker=symbol,
+        count=len(dividends),
+        dividends=dividends,
         latency_ms=_elapsed_ms(started),
     )
 
