@@ -1,0 +1,25 @@
+# Single-container Airflow for the lab. Run from this folder:
+#
+#   docker compose up --build        # UI on http://localhost:8089
+#
+# The project name keeps these containers apart from the repo's main stack
+# (docker-compose.yml) and its full Airflow stack (docker-compose-airflow.yaml).
+name: fis-airflow-lab
+
+services:
+  airflow:
+    build: .
+    image: fis-airflow-lab:latest
+    ports:
+      # 8080 is taken by this repo's gateway and 8088 by the root Airflow stack.
+      # Bound to 127.0.0.1 because the image disables login (see Dockerfile).
+      - "127.0.0.1:${AIRFLOW_LAB_PORT:-8089}:8080"
+    volumes:
+      # Edit DAGs on the host; the dag-processor picks up changes in ~30 s.
+      - ./dags:/opt/airflow/dags
+    healthcheck:
+      test: ["CMD", "curl", "--fail", "http://localhost:8080/api/v2/monitor/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
