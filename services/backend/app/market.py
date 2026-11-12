@@ -72,6 +72,18 @@ class History(BaseModel):
     latency_ms: int
 
 
+class Dividend(BaseModel):
+    date: datetime
+    amount: float
+
+
+class Dividends(BaseModel):
+    ticker: str
+    count: int
+    dividends: list[Dividend]
+    latency_ms: int
+
+
 class Fundamentals(BaseModel):
     ticker: str
     name: str | None = None
@@ -210,6 +222,37 @@ def get_history(
         interval=interval,
         count=len(bars),
         bars=bars,
+        latency_ms=_elapsed_ms(started),
+    )
+
+
+@router.get("/dividends/{ticker}", response_model=Dividends, summary="Dividend payment history")
+def get_dividends(ticker: TickerParam) -> Dividends:
+    """One entry per dividend payment, oldest first, from yfinance's `dividends` series."""
+    started = time.perf_counter()
+    symbol = ticker.upper()
+
+    try:
+        series = yf.Ticker(symbol).dividends
+    except YFRateLimitError:
+        raise _rate_limited() from None
+    except Exception as exc:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Upstream (Yahoo Finance) failed for '{symbol}'. Try again later.",
+        ) from exc
+
+    if series.empty:
+        raise HTTPException(
+            status_code=404,
+            detail=f"No dividends found for '{symbol}'. The symbol may be unknown, or it pays no dividends.",
+        )
+
+    items = [Dividend(date=when.to_pydatetime(), amount=float(amount)) for when, amount in series.items()]
+    return Dividends(
+        ticker=symbol,
+        count=len(items),
+        dividends=items,
         latency_ms=_elapsed_ms(started),
     )
 
