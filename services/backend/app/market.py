@@ -54,6 +54,10 @@ class Quote(BaseModel):
     latency_ms: int
 
 
+class SymbolInfo(BaseModel):
+    ticker: str
+
+
 class Bar(BaseModel):
     timestamp: datetime
     open: float
@@ -191,6 +195,12 @@ def get_quote(ticker: TickerParam) -> Quote:
         market_cap=_optional(fast, "marketCap"),
         latency_ms=_elapsed_ms(started),
     )
+
+
+@router.get("/symbol/{ticker}", response_model=SymbolInfo, summary="Normalise a ticker symbol")
+def get_symbol(ticker: TickerParam) -> SymbolInfo:
+    """Return the ticker in upper case. No upstream call."""
+    return SymbolInfo(ticker=ticker.upper())
 
 
 @router.get("/history/{ticker}", response_model=History, summary="OHLCV time series")
