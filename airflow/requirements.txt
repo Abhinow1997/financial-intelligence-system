@@ -1,0 +1,11 @@
+# Python packages the DAGs in dags/ import, installed into the Airflow image.
+# Rebuild after editing:  docker compose -f docker-compose-airflow.yaml up -d --build
+#
+# Don't list Airflow itself or packages the base image already ships, such as
+# pandas, requests and the common providers. To check what's there:
+#   docker run --rm fis-airflow:latest python -m pip list
+#   docker run --rm fis-airflow:latest airflow providers list
+
+# market_daily_snapshot. Pinned to 1.x: the 0.2.x line rate-limits aggressively
+# and lacks `fast_info`.
+yfinance>=1.7.0

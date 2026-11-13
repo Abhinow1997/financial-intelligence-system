@@ -23,8 +23,8 @@
 # This configuration supports basic configuration using environment variables or an .env file
 # The following variables are supported:
 #
-# AIRFLOW_IMAGE_NAME           - Docker image name used to run Airflow.
-#                                Default: apache/airflow:3.3.2
+# AIRFLOW_IMAGE_NAME           - Tag for the image built from airflow/Dockerfile.
+#                                Default: fis-airflow:latest
 # AIRFLOW_UID                  - User ID in Airflow containers
 #                                Default: 50000
 # AIRFLOW_PROJ_DIR             - Base path to which all the files will be volumed.
@@ -44,13 +44,20 @@
 #
 # Feel free to modify this file to suit your needs.
 ---
+# Added for this repo: the project name. It keeps these containers (and this file's
+# postgres/redis) apart from the main docker-compose.yml stack, so no -p flag is needed:
+#   docker compose -f docker-compose-airflow.yaml up -d --build    # start
+#   docker compose -f docker-compose-airflow.yaml down             # stop
+name: fis-airflow
+
 x-airflow-common:
   &airflow-common
-  # In order to add custom dependencies or upgrade provider distributions you can use your extended image.
-  # Comment the image line, place your Dockerfile in the directory where you placed the docker-compose.yaml
-  # and uncomment the "build" line below, Then run `docker-compose build` to build the images.
-  image: ${AIRFLOW_IMAGE_NAME:-apache/airflow:3.3.2}
-  # build: .
+  # Changed for this repo: build our own image from airflow/Dockerfile (the official
+  # apache/airflow:3.3.2 plus airflow/requirements.txt) instead of pulling the stock one.
+  # To add a DAG dependency, edit airflow/requirements.txt and run `make airflow-up`
+  # (it passes --build).
+  build: ./airflow
+  image: ${AIRFLOW_IMAGE_NAME:-fis-airflow:latest}
   env_file:
     - ${ENV_FILE_PATH:-.env}
   environment:
@@ -73,10 +80,9 @@ x-airflow-common:
     AIRFLOW__SCHEDULER__ENABLE_HEALTH_CHECK: 'true'
     # WARNING: Use _PIP_ADDITIONAL_REQUIREMENTS option ONLY for a quick checks
     # for other purpose (development, test and especially production usage) build/extend Airflow image.
-    # Pinned to 1.x: the 0.2.x line rate-limits aggressively and lacks `fast_info`.
-    # This reinstalls on EVERY container start (~40s x 6 containers). Fine for the
-    # lab; build a custom image before you rely on it. See the runbook.
-    _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-yfinance>=1.7.0}
+    # This repo does: DAG dependencies (e.g. yfinance) are baked into the image from
+    # airflow/requirements.txt, so this stays empty and nothing reinstalls on start.
+    _PIP_ADDITIONAL_REQUIREMENTS: ${_PIP_ADDITIONAL_REQUIREMENTS:-}
     # The following line can be used to set a custom config file, stored in the local config folder
     AIRFLOW_CONFIG: '/opt/airflow/config/airflow.cfg'
   volumes:

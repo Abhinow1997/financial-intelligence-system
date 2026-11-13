@@ -1,14 +1,23 @@
 """
 ### Daily market snapshot
 
-Pulls a closing-price snapshot for a handful of tickers from Yahoo Finance, ranks
-them by daily return, and writes one JSON report per run into the shared data lake.
+Pulls a closing-price snapshot for the tickers on the watchlist from Yahoo Finance,
+ranks them by daily return, and writes one JSON report per run into the shared data lake.
+
+**Which tickers** (the first one that's set wins):
+
+1. `tickers` in the run's config, for a one-off manual run, e.g. `{"tickers": ["AAPL"]}`.
+2. The Variable `watchlist_tickers` (**Admin → Variables**), e.g. `AAPL,MSFT,NVDA,AMZN`
+   or `["AAPL", "MSFT"]`. The scheduled daily run uses this, and so does
+   `parallel_02_dynamic_mapping`: change the watchlist once and both DAGs follow it.
+3. `DEFAULT_TICKERS` in this file, if neither of the above is set.
 
 This is the "why a scheduler and not a `for` loop" demo for the course. The work
 itself is trivial; what Airflow adds is:
 
-* **one task per ticker** (`.expand()`), so four symbols are fetched in parallel
-  across Celery workers instead of serially;
+* **one task per ticker** (`.expand()`), so every symbol on the watchlist is
+  fetched in parallel across Celery workers instead of serially. Add a ticker to
+  the Variable and the next run has one more parallel task, with no code change;
 * **a retry boundary per ticker** — a rate-limited `NVDA` retries on its own and
   does not re-fetch the three symbols that already succeeded;
 * **a distinction between retryable and permanent failure** — a throttled request
@@ -28,8 +37,8 @@ from pathlib import Path
 
 import pendulum
 import yfinance as yf
-from airflow.exceptions import AirflowFailException
-from airflow.sdk import dag, get_current_context, task
+from airflow.sdk.exceptions import AirflowFailException
+from airflow.sdk import Param, Variable, dag, get_current_context, task
 from yfinance.exceptions import YFRateLimitError
 
 log = logging.getLogger(__name__)
@@ -38,7 +47,15 @@ log = logging.getLogger(__name__)
 # output from the host. `data/processed/*` is gitignored.
 OUTPUT_DIR = Path("/opt/airflow/data/processed/market_snapshots")
 
+VARIABLE_KEY = "watchlist_tickers"
 DEFAULT_TICKERS = ["AAPL", "MSFT", "NVDA", "AMZN"]
+
+
+def parse_tickers(raw: str) -> list[str]:
+    """Accept a JSON list (["AAPL", "MSFT"]) or a comma-separated string (AAPL,MSFT)."""
+    raw = raw.strip()
+    items = json.loads(raw) if raw.startswith("[") else raw.split(",")
+    return [str(t).strip().upper() for t in items if str(t).strip()]
 
 
 @dag(
@@ -58,19 +75,41 @@ DEFAULT_TICKERS = ["AAPL", "MSFT", "NVDA", "AMZN"]
     },
     tags=["lab", "market-data", "yfinance"],
     doc_md=__doc__,
-    params={"tickers": DEFAULT_TICKERS},
+    params={
+        "tickers": Param(
+            [],
+            type="array",
+            description=(
+                "Optional: tickers for this run only. "
+                f"Leave empty to use the {VARIABLE_KEY} Variable."
+            ),
+        )
+    },
 )
 def market_daily_snapshot():
     @task
     def list_tickers() -> list[str]:
-        """Read the ticker list from the run's params.
+        """Decide which tickers this run fetches: run config, then Variable, then default.
 
-        Exposing this as a param means you can trigger the DAG from the UI with a
-        different basket without editing code.
+        Its return value drives `.expand()` below, so the length of this list is
+        the number of parallel `fetch_one` tasks. The Variable is read here, at run
+        time, not at the top of the file: top-level code runs every time Airflow
+        parses the file (about every 30 s), even when nothing is running.
         """
-        tickers = get_current_context()["params"]["tickers"]
-        log.info("Fetching %d symbols: %s", len(tickers), tickers)
-        return [t.upper() for t in tickers]
+        override = get_current_context()["params"]["tickers"]
+        if override:
+            tickers, source = [str(t).upper() for t in override], "run config"
+        else:
+            raw = Variable.get(VARIABLE_KEY, default=None)
+            if raw:
+                tickers, source = parse_tickers(raw), f"Variable {VARIABLE_KEY}"
+            else:
+                tickers, source = DEFAULT_TICKERS, "DEFAULT_TICKERS (Variable not set)"
+
+        if not tickers:
+            raise AirflowFailException(f"{source} gave an empty ticker list.")
+        log.info("Fetching %d symbols from %s: %s", len(tickers), source, tickers)
+        return tickers
 
     @task
     def fetch_one(ticker: str) -> dict:
@@ -123,9 +162,10 @@ def market_daily_snapshot():
     def write_report(summary: dict) -> str:
         """Write one JSON file per run, named for the period the data covers."""
         context = get_current_context()
-        # Airflow 3 allows a null `logical_date` on manually triggered runs, so fall
-        # back to `run_after`, which is always set.
-        stamp = (context["logical_date"] or context["dag_run"].run_after).date()
+        # Manually triggered runs in Airflow 3 have no `logical_date`: the key is
+        # missing from the context, not just None. So use .get() and fall back to
+        # `run_after`, which is always set.
+        stamp = (context.get("logical_date") or context["dag_run"].run_after).date()
 
         OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
         # Same filename for the same date => re-running a day replaces it. That is

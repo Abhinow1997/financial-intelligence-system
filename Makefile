@@ -38,15 +38,12 @@ up-core: ## Start the core serving path only
 up-data: ## Start datastores only (postgres/redis/qdrant/minio/redpanda)
 	docker compose up postgres redis qdrant minio redpanda
 
-# Airflow ships its own compose file. The -p flag is REQUIRED: without it Docker
-# derives the project name from this directory, which is the same name the main
-# stack uses, and the two files' `postgres`/`redis` services would clobber each
-# other's containers. `fis-airflow` (not plain `airflow`) also keeps this stack
-# clear of any unrelated Airflow you may already run on this machine.
-AIRFLOW := docker compose -p fis-airflow -f docker-compose-airflow.yaml
+# Airflow ships its own compose file. Its project name (fis-airflow) is set inside
+# the file, which keeps its postgres/redis containers apart from the main stack's.
+AIRFLOW := docker compose -f docker-compose-airflow.yaml
 
-airflow-up: ## Start Airflow (UI on :8088, login airflow/airflow)
-	$(AIRFLOW) up -d
+airflow-up: ## Build the image + start Airflow (UI on :8088, login airflow/airflow)
+	$(AIRFLOW) up -d --build
 
 airflow-ps: ## Show Airflow container health
 	$(AIRFLOW) ps
