@@ -1,10 +1,10 @@
 {
   "version": 1,
   "tasks": {
-    "31": {
-      "status": "pr_requested",
+    "37": {
+      "status": "done",
       "pr": null,
-      "note": "GET /market/symbol/{ticker}; branch feat/r3-task-31-market-symbol; draft PR requested 2026-11-12, confirm against prs.json next run"
+      "note": "Q&A task ('What are the endpoints in the backend'); answered with an add_comment listing the endpoints, no PR"
     }
   },
   "activity_issue": {
@@ -16,6 +16,7 @@
     "pytest with both 'tests' and 'services/backend/tests' in one call fails at collection (duplicate 'tests' package); run them separately",
     "A task marked pr_open/pr_requested with no matching entry in prs.json was never opened; treat as not started",
     "Before choosing a branch name, check git branch -r --list origin/<name>; append -2 if taken",
+    "Task #31 (market symbol) dropped 2026-11-13: no longer in tasks.json and no open PR; /market/symbol route is not in main",
     "Task #26 (dividends) dropped 2026-11-12: no longer in tasks.json and no open PR",
     "Activity issue for 2026-11 created 2026-11-12 (output so_U6s9fNhNSJO-); its issue number is not known in this run, so find it by title before updating"
   ]
