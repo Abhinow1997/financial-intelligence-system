@@ -317,4 +317,10 @@ def compare(req: CompareRequest) -> CompareResponse:
         best=rows[0].ticker,
         latency_ms=_elapsed_ms(started),
     )
+
+
+@router.get("/symbol/{ticker}")
+def get_symbol(ticker: str):
+    return {"ticker": ticker.upper()}
+
 # Every response carries latency_ms so the dashboard can show how slow the upstream was.
