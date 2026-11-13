@@ -37,11 +37,11 @@ log = logging.getLogger(__name__)
     # since start_date.
     catchup=False,
     default_args={
-        "owner": "airflow-lab",
+        "owner": "lab",
         "retries": 1,
         "retry_delay": timedelta(seconds=30),
     },
-    tags=["lab", "airflow-lab"],
+    tags=["lab", "tutorial"],
     doc_md=__doc__,
 )
 def hello_airflow():
